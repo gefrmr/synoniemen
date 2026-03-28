@@ -67,14 +67,11 @@
             transition: 0.2s;
             min-width: 150px;
         }
-        .blurred {
-            filter: blur(4px);
-            transition: filter 0.2s ease;
-            user-select: none;
-        }
         .revealed {
-            filter: blur(0);
             background: #d4e6f1;
+        }
+        .blurred-letters {
+            filter: blur(4px);
         }
         .nl-translation {
             font-size: 1rem;
@@ -141,10 +138,6 @@
                 font-size: 1.6rem;
             }
         }
-
-        .blurred-letters {
-            filter: blur(4px);
-        }
     </style>
 </head>
 <body>
@@ -163,34 +156,58 @@
         const SHEET_NAME = 'Blad1';               // De naam van het tabblad (default Blad1)
         // ====================================
 
-        let exercises = [];           // array van oefeningen: { mainPt, mainNl, synonyms: [{pt, nl}] }
+        let exercises = [];
         let currentIndex = 0;
-        let revealedStatus = [];      // per oefening bijhouden welke synoniemen zijn ontblurd (boolean array)
-        let allRevealed = false;
+        let revealedStatus = [];
 
-        // Haal data op via Google Sheets API
+        // Fisher-Yates shuffle
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
         async function fetchWords() {
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}?key=${API_KEY}`;
+            let url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME)}?key=${API_KEY}`;
             try {
-                const response = await fetch(url);
-                const data = await response.json();
-                if (!data.values) {
-                    throw new Error('Geen data gevonden. Controleer sheet ID en API key.');
+                let response = await fetch(url);
+                let data = await response.json();
+                
+                if (data.error && data.error.code === 404) {
+                    console.warn(`Tabblad "${SHEET_NAME}" niet gevonden, zoek eerste tabblad...`);
+                    const metadataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?key=${API_KEY}`;
+                    const metaResponse = await fetch(metadataUrl);
+                    const metaData = await metaResponse.json();
+                    if (metaData.sheets && metaData.sheets.length > 0) {
+                        const firstSheetName = metaData.sheets[0].properties.title;
+                        console.log(`Eerste tabblad gevonden: "${firstSheetName}"`);
+                        url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(firstSheetName)}?key=${API_KEY}`;
+                        response = await fetch(url);
+                        data = await response.json();
+                    } else {
+                        throw new Error('Geen tabbladen gevonden in de sheet.');
+                    }
                 }
+                
+                if (!data.values) {
+                    throw new Error('Geen data gevonden. Controleer of de sheet openbaar is en of er rijen met data staan.');
+                }
+                console.log('Ruwe data uit sheet:', data.values);
                 return parseSheetData(data.values);
             } catch (error) {
                 console.error(error);
-                document.getElementById('app').innerHTML = `<div class="card" style="color:red;">❌ Fout bij laden: ${error.message}<br>Controleer je API‑sleutel en sheet‑ID.</div>`;
+                document.getElementById('app').innerHTML = `<div class="card" style="color:red;">❌ Fout bij laden: ${error.message}<br>Controleer je API‑sleutel, sheet‑ID en of de sheet openbaar is.</div>`;
                 return [];
             }
         }
 
-        // Parse sheet: eerste rij headers, daarna rijen met data
         function parseSheetData(rows) {
             if (rows.length < 2) return [];
-            const headers = rows[0].map(h => h.trim().toLowerCase());
+            const headers = rows[0].map(h => h ? h.trim().toLowerCase() : '');
+            console.log('Headers (lowercase):', headers);
             
-            // Zoek kolomindices voor hoofdwerkwoord en hoofdvertaling
             const mainPtIdx = headers.findIndex(h => h === 'hoofd_werkwoord_pt');
             const mainNlIdx = headers.findIndex(h => h === 'hoofd_vertaling_nl');
             if (mainPtIdx === -1 || mainNlIdx === -1) {
@@ -198,12 +215,9 @@
                 return [];
             }
             
-            // Verzamel alle synoniem kolomparen (pt, nl)
             const synonymPairs = [];
-            // we zoeken naar kolommen die beginnen met "synoniem_pt"
             for (let i = 0; i < headers.length; i++) {
                 if (headers[i].startsWith('synoniem_pt')) {
-                    // bijbehorende nl kolom: vervang "pt" door "nl" in de header
                     const nlHeader = headers[i].replace('pt', 'nl');
                     const nlIdx = headers.findIndex(h => h === nlHeader);
                     if (nlIdx !== -1) {
@@ -213,14 +227,12 @@
                     }
                 }
             }
-            
-            if (synonymPairs.length === 0) {
-                console.warn('Geen synoniem kolommen gevonden (begin met "synoniem_pt")');
-            }
+            console.log('Synoniem paren (kolomindices):', synonymPairs);
             
             const exercisesList = [];
             for (let r = 1; r < rows.length; r++) {
                 const row = rows[r];
+                if (!row || row.length === 0) continue;
                 const mainPt = row[mainPtIdx]?.trim();
                 const mainNl = row[mainNlIdx]?.trim();
                 if (!mainPt || !mainNl) continue;
@@ -233,53 +245,34 @@
                         synonyms.push({ pt, nl });
                     }
                 }
-                if (synonyms.length === 0) {
-                    console.warn(`Geen synoniemen gevonden voor ${mainPt}, overslaan.`);
-                    continue;
-                }
-                exercisesList.push({
-                    mainPt: mainPt,
-                    mainNl: mainNl,
-                    synonyms: synonyms
-                });
+                if (synonyms.length === 0) continue;
+                exercisesList.push({ mainPt, mainNl, synonyms });
             }
+            console.log(`Totaal ${exercisesList.length} oefeningen geladen.`);
             return exercisesList;
         }
 
-        // Render de huidige oefening
         function renderExercise() {
             if (!exercises.length) return;
             const exercise = exercises[currentIndex];
             const synonyms = exercise.synonyms;
-            const revealed = revealedStatus[currentIndex]; // array van booleans
+            const revealed = revealedStatus[currentIndex];
             
             let synonymsHtml = '';
             synonyms.forEach((syn, idx) => {
                 const isRevealed = revealed[idx];
-                const blurredClass = isRevealed ? 'revealed' : 'blurred';
-                // Toon alleen eerste letter + blur bij niet-ontblurd
-                let displayText = syn.pt;
-                if (!isRevealed) {
-                    // alleen eerste letter tonen, rest is nog steeds aanwezig maar geblurd
-                    // we kunnen de volledige tekst tonen met blur, dat is wat de gebruiker wil.
-                    // Maar we moeten alleen de eerste letter zichtbaar houden? De eis: "enkel de eerste letter is zichtbaar, de rest is geblurd"
-                    // Dat kunnen we doen door de tekst op te splitsen in eerste letter en de rest, maar filter:blur() maakt alles wazig.
-                    // Alternatief: gebruik een aparte styling waarbij we de eerste letter normaal tonen en de rest geblurd.
-                    // Simpelste: gebruik hetzelfde blur-effect, maar voeg een pseudo-element toe? 
-                    // Om het echt duidelijk te maken: we tonen de volledige tekst maar met blur, zodat je de letters wel vaag ziet maar niet kunt lezen.
-                    // De gebruiker kan klikken om te ontbluren. Dat voldoet aan "enkel de eerste letter is zichtbaar, de rest is geblurd"?
-                    // De eerste letter is ook geblurd in dat geval. Om specifiek de eerste letter zichtbaar te houden moeten we een andere aanpak doen.
-                    // Laten we een betere implementatie doen: toon de eerste letter normaal, en de rest van de letters met een blur (of met een mask).
-                    // Dat is gebruiksvriendelijker.
-                    // We passen de weergave aan: we splitsen de string in eerste teken en de rest.
+                let displayHtml = '';
+                if (isRevealed) {
+                    displayHtml = syn.pt;
+                } else {
                     const firstLetter = syn.pt.charAt(0);
                     const restLetters = syn.pt.slice(1);
-                    displayText = `${firstLetter}<span class="blurred-letters">${restLetters}</span>`;
+                    displayHtml = `${firstLetter}<span class="blurred-letters">${restLetters}</span>`;
                 }
                 synonymsHtml += `
                     <div class="synonym-item">
                         <div class="pt-word ${isRevealed ? 'revealed' : ''}" data-idx="${idx}">
-                            ${displayText}
+                            ${displayHtml}
                         </div>
                         <div class="nl-translation">${syn.nl}</div>
                     </div>
@@ -314,21 +307,17 @@
             const app = document.getElementById('app');
             app.innerHTML = html;
             
-            // Event listeners voor de synoniem woorden
-            const wordElements = document.querySelectorAll('.pt-word');
-            wordElements.forEach(el => {
+            document.querySelectorAll('.pt-word').forEach(el => {
                 el.addEventListener('click', (e) => {
                     const idx = parseInt(el.dataset.idx);
                     if (!revealedStatus[currentIndex][idx]) {
-                        // Ontblur dit synoniem
                         revealedStatus[currentIndex][idx] = true;
-                        renderExercise(); // hertekenen
+                        renderExercise();
                     }
                     e.stopPropagation();
                 });
             });
             
-            // Volgende knop
             const nextBtn = document.getElementById('nextBtn');
             if (nextBtn) {
                 nextBtn.addEventListener('click', () => {
@@ -336,7 +325,6 @@
                         currentIndex++;
                         renderExercise();
                     } else {
-                        // Einde van alle oefeningen
                         const app = document.getElementById('app');
                         app.innerHTML = `
                             <div class="card">
@@ -345,23 +333,19 @@
                                 <button class="reset-btn" id="resetEndBtn">Opnieuw beginnen</button>
                             </div>
                         `;
-                        document.getElementById('resetEndBtn').addEventListener('click', () => {
-                            resetGame();
-                        });
+                        document.getElementById('resetEndBtn').addEventListener('click', resetGame);
                     }
                 });
             }
             
-            // Reset knop
             const resetBtn = document.getElementById('resetBtn');
-            if (resetBtn) {
-                resetBtn.addEventListener('click', resetGame);
-            }
+            if (resetBtn) resetBtn.addEventListener('click', resetGame);
         }
         
         function resetGame() {
+            // Schud de oefeningen opnieuw
+            exercises = shuffleArray(exercises);
             currentIndex = 0;
-            // reset revealedStatus voor alle oefeningen
             revealedStatus = exercises.map(ex => Array(ex.synonyms.length).fill(false));
             renderExercise();
         }
@@ -369,10 +353,11 @@
         async function init() {
             exercises = await fetchWords();
             if (exercises.length === 0) {
-                document.getElementById('app').innerHTML = '<div class="card">❌ Geen geldige oefeningen gevonden. Controleer de kolomnamen in je sheet.</div>';
+                document.getElementById('app').innerHTML = '<div class="card">❌ Geen geldige oefeningen gevonden. Controleer de kolomnamen en de data in je sheet. Bekijk de console (F12) voor details.</div>';
                 return;
             }
-            // initialiseer revealedStatus voor elke oefening
+            // Schud de oefeningen willekeurig
+            exercises = shuffleArray(exercises);
             revealedStatus = exercises.map(ex => Array(ex.synonyms.length).fill(false));
             renderExercise();
         }
