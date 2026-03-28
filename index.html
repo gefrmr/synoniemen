@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Synoniemen oefenen - Portugees (BR) → Nederlands</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 1rem;
+            background: #f0f7ff;
+            color: #1e2a3a;
+        }
+        h1 {
+            text-align: center;
+            color: #0f3b5c;
+        }
+        .card {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        .main-word {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .main-word h2 {
+            font-size: 2rem;
+            margin: 0.5rem 0;
+            color: #1e6f5c;
+        }
+        .main-word p {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin: 0;
+        }
+        .synonyms-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .synonym-item {
+            background: #f9f9fc;
+            border-radius: 16px;
+            padding: 0.8rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+        .pt-word {
+            font-size: 1.3rem;
+            font-weight: bold;
+            cursor: pointer;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            background: #eef2f7;
+            transition: 0.2s;
+            min-width: 150px;
+        }
+        .blurred {
+            filter: blur(4px);
+            transition: filter 0.2s ease;
+            user-select: none;
+        }
+        .revealed {
+            filter: blur(0);
+            background: #d4e6f1;
+        }
+        .nl-translation {
+            font-size: 1rem;
+            color: #4a627a;
+            background: #e9ecef;
+            padding: 0.2rem 0.8rem;
+            border-radius: 20px;
+        }
+        .progress {
+            text-align: center;
+            margin-top: 1rem;
+            font-weight: bold;
+            color: #2c6e9e;
+        }
+        .next-btn, .reset-btn {
+            background: #1e6f5c;
+            color: white;
+            border: none;
+            border-radius: 40px;
+            padding: 0.7rem 1.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            margin: 0.5rem;
+            transition: 0.2s;
+        }
+        .next-btn:hover, .reset-btn:hover {
+            background: #0e4f40;
+            transform: scale(1.02);
+        }
+        .next-btn:disabled {
+            background: #b0bec5;
+            cursor: not-allowed;
+        }
+        .feedback {
+            text-align: center;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+            color: #2c6e9e;
+        }
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            font-size: 1.2rem;
+        }
+        footer {
+            text-align: center;
+            margin-top: 2rem;
+            font-size: 0.8rem;
+            color: #6c7a89;
+        }
+        button {
+            background: none;
+            border: none;
+        }
+        @media (max-width: 600px) {
+            .pt-word {
+                font-size: 1rem;
+                min-width: 120px;
+            }
+            .nl-translation {
+                font-size: 0.9rem;
+            }
+            .main-word h2 {
+                font-size: 1.6rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>📖 Synoniemen oefenen (PT-BR → NL)</h1>
+    <div id="app">
+        <div class="loading">⏳ Woordenlijst laden uit Google Sheets...</div>
+    </div>
+    <footer>
+        Data uit Google Sheets | Klik op een gebluurd woord om het te ontbluren
+    </footer>
+
+    <script>
+        // ========== CONFIGURATIE ==========
+        const API_KEY = 'JOUW_API_SLEUTEL';       // Vervang door jouw API key
+        const SHEET_ID = 'JOUW_SPREADSHEET_ID';   // Vervang door jouw sheet ID
+        const SHEET_NAME = 'Blad1';               // De naam van het tabblad (default Blad1)
+        // ====================================
+
+        let exercises = [];           // array van oefeningen: { mainPt, mainNl, synonyms: [{pt, nl}] }
+        let currentIndex = 0;
+        let revealedStatus = [];      // per oefening bijhouden welke synoniemen zijn ontblurd (boolean array)
+        let allRevealed = false;
+
+        // Haal data op via Google Sheets API
+        async function fetchWords() {
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}?key=${API_KEY}`;
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                if (!data.values) {
+                    throw new Error('Geen data gevonden. Controleer sheet ID en API key.');
+                }
+                return parseSheetData(data.values);
+            } catch (error) {
+                console.error(error);
+                document.getElementById('app').innerHTML = `<div class="card" style="color:red;">❌ Fout bij laden: ${error.message}<br>Controleer je API‑sleutel en sheet‑ID.</div>`;
+                return [];
+            }
+        }
+
+        // Parse sheet: eerste rij headers, daarna rijen met data
+        function parseSheetData(rows) {
+            if (rows.length < 2) return [];
+            const headers = rows[0].map(h => h.trim().toLowerCase());
+            
+            // Zoek kolomindices voor hoofdwerkwoord en hoofdvertaling
+            const mainPtIdx = headers.findIndex(h => h === 'hoofd_werkwoord_pt');
+            const mainNlIdx = headers.findIndex(h => h === 'hoofd_vertaling_nl');
+            if (mainPtIdx === -1 || mainNlIdx === -1) {
+                console.error('Kolommen "hoofd_werkwoord_pt" en/of "hoofd_vertaling_nl" niet gevonden.');
+                return [];
+            }
+            
+            // Verzamel alle synoniem kolomparen (pt, nl)
+            const synonymPairs = [];
+            // we zoeken naar kolommen die beginnen met "synoniem_pt"
+            for (let i = 0; i < headers.length; i++) {
+                if (headers[i].startsWith('synoniem_pt')) {
+                    // bijbehorende nl kolom: vervang "pt" door "nl" in de header
+                    const nlHeader = headers[i].replace('pt', 'nl');
+                    const nlIdx = headers.findIndex(h => h === nlHeader);
+                    if (nlIdx !== -1) {
+                        synonymPairs.push({ ptIdx: i, nlIdx: nlIdx });
+                    } else {
+                        console.warn(`Geen bijbehorende nl-kolom gevonden voor ${headers[i]}`);
+                    }
+                }
+            }
+            
+            if (synonymPairs.length === 0) {
+                console.warn('Geen synoniem kolommen gevonden (begin met "synoniem_pt")');
+            }
+            
+            const exercisesList = [];
+            for (let r = 1; r < rows.length; r++) {
+                const row = rows[r];
+                const mainPt = row[mainPtIdx]?.trim();
+                const mainNl = row[mainNlIdx]?.trim();
+                if (!mainPt || !mainNl) continue;
+                
+                const synonyms = [];
+                for (let pair of synonymPairs) {
+                    const pt = row[pair.ptIdx]?.trim();
+                    const nl = row[pair.nlIdx]?.trim();
+                    if (pt && nl) {
+                        synonyms.push({ pt, nl });
+                    }
+                }
+                if (synonyms.length === 0) {
+                    console.warn(`Geen synoniemen gevonden voor ${mainPt}, overslaan.`);
+                    continue;
+                }
+                exercisesList.push({
+                    mainPt: mainPt,
+                    mainNl: mainNl,
+                    synonyms: synonyms
+                });
+            }
+            return exercisesList;
+        }
+
+        // Render de huidige oefening
+        function renderExercise() {
+            if (!exercises.length) return;
+            const exercise = exercises[currentIndex];
+            const synonyms = exercise.synonyms;
+            const revealed = revealedStatus[currentIndex]; // array van booleans
+            
+            let synonymsHtml = '';
+            synonyms.forEach((syn, idx) => {
+                const isRevealed = revealed[idx];
+                const blurredClass = isRevealed ? 'revealed' : 'blurred';
+                // Toon alleen eerste letter + blur bij niet-ontblurd
+                let displayText = syn.pt;
+                if (!isRevealed) {
+                    // alleen eerste letter tonen, rest is nog steeds aanwezig maar geblurd
+                    // we kunnen de volledige tekst tonen met blur, dat is wat de gebruiker wil.
+                    // Maar we moeten alleen de eerste letter zichtbaar houden? De eis: "enkel de eerste letter is zichtbaar, de rest is geblurd"
+                    // Dat kunnen we doen door de tekst op te splitsen in eerste letter en de rest, maar filter:blur() maakt alles wazig.
+                    // Alternatief: gebruik een aparte styling waarbij we de eerste letter normaal tonen en de rest geblurd.
+                    // Simpelste: gebruik hetzelfde blur-effect, maar voeg een pseudo-element toe? 
+                    // Om het echt duidelijk te maken: we tonen de volledige tekst maar met blur, zodat je de letters wel vaag ziet maar niet kunt lezen.
+                    // De gebruiker kan klikken om te ontbluren. Dat voldoet aan "enkel de eerste letter is zichtbaar, de rest is geblurd"?
+                    // De eerste letter is ook geblurd in dat geval. Om specifiek de eerste letter zichtbaar te houden moeten we een andere aanpak doen.
+                    // Laten we een betere implementatie doen: toon de eerste letter normaal, en de rest van de letters met een blur (of met een mask).
+                    // Dat is gebruiksvriendelijker.
+                    // We passen de weergave aan: we splitsen de string in eerste teken en de rest.
+                    const firstLetter = syn.pt.charAt(0);
+                    const restLetters = syn.pt.slice(1);
+                    displayText = `${firstLetter}<span class="blurred-letters">${restLetters}</span>`;
+                }
+                synonymsHtml += `
+                    <div class="synonym-item">
+                        <div class="pt-word ${isRevealed ? 'revealed' : ''}" data-idx="${idx}">
+                            ${displayText}
+                        </div>
+                        <div class="nl-translation">${syn.nl}</div>
+                    </div>
+                `;
+            });
+            
+            const allRevealedFlag = revealed.every(v => v === true);
+            const nextDisabled = !allRevealedFlag;
+            
+            const html = `
+                <div class="card">
+                    <div class="main-word">
+                        <h2>${exercise.mainPt}</h2>
+                        <p>🇳🇱 ${exercise.mainNl}</p>
+                    </div>
+                    <div class="synonyms-list">
+                        ${synonymsHtml}
+                    </div>
+                    <div class="progress">
+                        Oefening ${currentIndex+1} van ${exercises.length}
+                    </div>
+                    <div style="text-align: center; margin-top: 1.5rem;">
+                        <button class="next-btn" id="nextBtn" ${nextDisabled ? 'disabled' : ''}>➡ Volgende oefening</button>
+                        <button class="reset-btn" id="resetBtn">🔄 Opnieuw beginnen</button>
+                    </div>
+                    <div class="feedback" id="feedback">
+                        ${!allRevealedFlag ? 'Klik op de geblurde woorden om ze te ontbluren.' : 'Alle woorden zijn ontblurd! Ga verder.'}
+                    </div>
+                </div>
+            `;
+            
+            const app = document.getElementById('app');
+            app.innerHTML = html;
+            
+            // Event listeners voor de synoniem woorden
+            const wordElements = document.querySelectorAll('.pt-word');
+            wordElements.forEach(el => {
+                el.addEventListener('click', (e) => {
+                    const idx = parseInt(el.dataset.idx);
+                    if (!revealedStatus[currentIndex][idx]) {
+                        // Ontblur dit synoniem
+                        revealedStatus[currentIndex][idx] = true;
+                        renderExercise(); // hertekenen
+                    }
+                    e.stopPropagation();
+                });
+            });
+            
+            // Volgende knop
+            const nextBtn = document.getElementById('nextBtn');
+            if (nextBtn) {
+                nextBtn.addEventListener('click', () => {
+                    if (currentIndex + 1 < exercises.length) {
+                        currentIndex++;
+                        renderExercise();
+                    } else {
+                        // Einde van alle oefeningen
+                        const app = document.getElementById('app');
+                        app.innerHTML = `
+                            <div class="card">
+                                <h2>🏆 Gefeliciteerd! 🏆</h2>
+                                <p>Je hebt alle ${exercises.length} oefeningen voltooid.</p>
+                                <button class="reset-btn" id="resetEndBtn">Opnieuw beginnen</button>
+                            </div>
+                        `;
+                        document.getElementById('resetEndBtn').addEventListener('click', () => {
+                            resetGame();
+                        });
+                    }
+                });
+            }
+            
+            // Reset knop
+            const resetBtn = document.getElementById('resetBtn');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', resetGame);
+            }
+        }
+        
+        function resetGame() {
+            currentIndex = 0;
+            // reset revealedStatus voor alle oefeningen
+            revealedStatus = exercises.map(ex => Array(ex.synonyms.length).fill(false));
+            renderExercise();
+        }
+        
+        async function init() {
+            exercises = await fetchWords();
+            if (exercises.length === 0) {
+                document.getElementById('app').innerHTML = '<div class="card">❌ Geen geldige oefeningen gevonden. Controleer de kolomnamen in je sheet.</div>';
+                return;
+            }
+            // initialiseer revealedStatus voor elke oefening
+            revealedStatus = exercises.map(ex => Array(ex.synonyms.length).fill(false));
+            renderExercise();
+        }
+        
+        init();
+    </script>
+</body>
+</html>
