@@ -10,7 +10,7 @@
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 800px;
+            max-width: 1000px;
             margin: 2rem auto;
             padding: 1rem;
             background: #f0f7ff;
@@ -30,6 +30,8 @@
         .main-word {
             text-align: center;
             margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #e2e8f0;
         }
         .main-word h2 {
             font-size: 2rem;
@@ -41,44 +43,53 @@
             color: #2c3e50;
             margin: 0;
         }
-        .synonyms-list {
-            display: flex;
-            flex-direction: column;
+        /* Grid van tegels: 2 kolommen, automatisch rijen */
+        .tiles-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
             gap: 1rem;
+            margin: 1.5rem 0;
         }
-        .synonym-item {
+        /* Individuele tegel */
+        .tile {
             background: #f9f9fc;
-            border-radius: 16px;
-            padding: 0.8rem 1rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            transition: all 0.2s;
+            border-radius: 20px;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            transition: 0.2s;
+            border: 1px solid #e2e8f0;
+        }
+        .nl-word {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 0.8rem;
+            background: #eef2f7;
+            display: inline-block;
+            padding: 0.2rem 0.8rem;
+            border-radius: 40px;
         }
         .pt-word {
-            font-size: 1.3rem;
+            font-size: 1.1rem;
             font-weight: bold;
             cursor: pointer;
-            padding: 0.2rem 0.5rem;
+            padding: 0.4rem;
             border-radius: 12px;
-            background: #eef2f7;
+            background: #ffffff;
             transition: 0.2s;
-            min-width: 150px;
+            display: inline-block;
+            min-width: 120px;
         }
-        .revealed {
-            background: #d4e6f1;
+        .pt-word.blurred {
+            filter: blur(0); /* Geen blur op de container, alleen op de letters */
         }
         .blurred-letters {
             filter: blur(4px);
         }
-        .nl-translation {
-            font-size: 1rem;
-            color: #4a627a;
-            background: #e9ecef;
-            padding: 0.2rem 0.8rem;
-            border-radius: 20px;
+        .revealed {
+            background: #d4e6f1;
+            filter: blur(0);
         }
         .progress {
             text-align: center;
@@ -127,11 +138,13 @@
             border: none;
         }
         @media (max-width: 600px) {
-            .pt-word {
-                font-size: 1rem;
-                min-width: 120px;
+            .tiles-grid {
+                grid-template-columns: 1fr;  /* Op mobiel 1 kolom */
             }
-            .nl-translation {
+            .nl-word {
+                font-size: 1rem;
+            }
+            .pt-word {
                 font-size: 0.9rem;
             }
             .main-word h2 {
@@ -146,7 +159,7 @@
         <div class="loading">⏳ Woordenlijst laden uit Google Sheets...</div>
     </div>
     <footer>
-        Data uit Google Sheets | Klik op een gebluurd woord om het te ontbluren
+        Data uit Google Sheets | Klik op een Portugees woord (geblurd) om het te ontbluren
     </footer>
 
     <script>
@@ -158,7 +171,7 @@
 
         let exercises = [];
         let currentIndex = 0;
-        let revealedStatus = [];
+        let revealedStatus = [];  // per oefening: array van booleans per synoniem
 
         // Fisher-Yates shuffle
         function shuffleArray(array) {
@@ -258,23 +271,24 @@
             const synonyms = exercise.synonyms;
             const revealed = revealedStatus[currentIndex];
             
-            let synonymsHtml = '';
+            // Bouw de tegels (grid)
+            let tilesHtml = '';
             synonyms.forEach((syn, idx) => {
                 const isRevealed = revealed[idx];
-                let displayHtml = '';
+                let ptDisplayHtml = '';
                 if (isRevealed) {
-                    displayHtml = syn.pt;
+                    ptDisplayHtml = syn.pt;
                 } else {
                     const firstLetter = syn.pt.charAt(0);
                     const restLetters = syn.pt.slice(1);
-                    displayHtml = `${firstLetter}<span class="blurred-letters">${restLetters}</span>`;
+                    ptDisplayHtml = `${firstLetter}<span class="blurred-letters">${restLetters}</span>`;
                 }
-                synonymsHtml += `
-                    <div class="synonym-item">
+                tilesHtml += `
+                    <div class="tile">
+                        <div class="nl-word">${syn.nl}</div>
                         <div class="pt-word ${isRevealed ? 'revealed' : ''}" data-idx="${idx}">
-                            ${displayHtml}
+                            ${ptDisplayHtml}
                         </div>
-                        <div class="nl-translation">${syn.nl}</div>
                     </div>
                 `;
             });
@@ -288,8 +302,8 @@
                         <h2>${exercise.mainPt}</h2>
                         <p>🇳🇱 ${exercise.mainNl}</p>
                     </div>
-                    <div class="synonyms-list">
-                        ${synonymsHtml}
+                    <div class="tiles-grid">
+                        ${tilesHtml}
                     </div>
                     <div class="progress">
                         Oefening ${currentIndex+1} van ${exercises.length}
@@ -299,7 +313,7 @@
                         <button class="reset-btn" id="resetBtn">🔄 Opnieuw beginnen</button>
                     </div>
                     <div class="feedback" id="feedback">
-                        ${!allRevealedFlag ? 'Klik op de geblurde woorden om ze te ontbluren.' : 'Alle woorden zijn ontblurd! Ga verder.'}
+                        ${!allRevealedFlag ? 'Klik op de Portugese woorden (geblurd) om ze te ontbluren.' : 'Alle woorden zijn ontblurd! Ga verder.'}
                     </div>
                 </div>
             `;
@@ -307,12 +321,13 @@
             const app = document.getElementById('app');
             app.innerHTML = html;
             
+            // Klik handlers voor elk Portugees woord
             document.querySelectorAll('.pt-word').forEach(el => {
                 el.addEventListener('click', (e) => {
                     const idx = parseInt(el.dataset.idx);
                     if (!revealedStatus[currentIndex][idx]) {
                         revealedStatus[currentIndex][idx] = true;
-                        renderExercise();
+                        renderExercise();  // Hertekenen met ontblurde versie
                     }
                     e.stopPropagation();
                 });
@@ -356,7 +371,7 @@
                 document.getElementById('app').innerHTML = '<div class="card">❌ Geen geldige oefeningen gevonden. Controleer de kolomnamen en de data in je sheet. Bekijk de console (F12) voor details.</div>';
                 return;
             }
-            // Schud de oefeningen willekeurig
+            // Schud de oefeningen willekeurig bij start
             exercises = shuffleArray(exercises);
             revealedStatus = exercises.map(ex => Array(ex.synonyms.length).fill(false));
             renderExercise();
