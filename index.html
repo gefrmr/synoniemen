@@ -6,398 +6,481 @@
     <title>Synoniemen oefenen - PT-BR → NL</title>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
-        /* (CSS blijft hetzelfde, we laten het hier weg voor de leesbaarheid, maar in je definitieve bestand zet je de volledige CSS zoals eerder) */
         * { box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 1rem; background: #f0f7ff; color: #1e2a3a; }
-        h1 { text-align: center; color: #0f3b5c; }
-        .card { background: white; border-radius: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); padding: 1.5rem; margin: 1.5rem 0; }
-        .main-word { text-align: center; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #e2e8f0; }
-        .main-word h2 { font-size: 2rem; margin: 0.5rem 0; color: #1e6f5c; }
-        .main-word p { font-size: 1.2rem; color: #2c3e50; margin: 0; }
-        .category { text-align: center; font-size: 0.9rem; color: #4a627a; background: #e9ecef; display: inline-block; padding: 0.2rem 1rem; border-radius: 30px; margin-top: 0.5rem; }
-        .tiles-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1.5rem 0; }
-        .tile { background: #f9f9fc; border-radius: 20px; padding: 1rem; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.05); transition: 0.2s; border: 1px solid #e2e8f0; }
-        .nl-word { font-size: 1.3rem; font-weight: 600; color: #2c3e50; margin-bottom: 0.8rem; background: #eef2f7; display: inline-block; padding: 0.2rem 0.8rem; border-radius: 40px; }
-        .pt-word { font-size: 1.1rem; font-weight: bold; cursor: pointer; padding: 0.4rem; border-radius: 12px; background: #ffffff; transition: 0.2s; display: inline-block; min-width: 120px; }
-        .blurred-letters { filter: blur(4px); }
-        .revealed { background: #d4e6f1; }
-        .progress { text-align: center; margin-top: 1rem; font-weight: bold; color: #2c6e9e; }
-        .next-btn, .reset-btn, .auth-btn { background: #1e6f5c; color: white; border: none; border-radius: 40px; padding: 0.7rem 1.5rem; font-size: 1rem; cursor: pointer; margin: 0.5rem; transition: 0.2s; }
-        .next-btn:hover, .reset-btn:hover, .auth-btn:hover { background: #0e4f40; transform: scale(1.02); }
-        .next-btn:disabled { background: #b0bec5; cursor: not-allowed; }
-        .feedback { text-align: center; font-size: 0.9rem; margin-top: 1rem; color: #2c6e9e; }
-        .loading { text-align: center; padding: 2rem; font-size: 1.2rem; }
-        footer { text-align: center; margin-top: 2rem; font-size: 0.8rem; color: #6c7a89; }
-        .star { font-size: 1.5rem; cursor: pointer; color: #ccc; transition: 0.2s; margin-left: 0.5rem; vertical-align: middle; }
-        .star.favorited { color: gold; }
-        .header-line { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
-        button { background: none; border: none; }
-        @media (max-width: 600px) {
-            .tiles-grid { grid-template-columns: 1fr; }
-            .nl-word { font-size: 1rem; }
-            .pt-word { font-size: 0.9rem; }
-            .main-word h2 { font-size: 1.6rem; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 1rem;
+            background: #f0f7ff;
+            color: #1e2a3a;
+        }
+        h1 {
+            text-align: center;
+            color: #0f3b5c;
+        }
+        .card {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        .main-word {
+            text-align: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .main-word h2 {
+            font-size: 2rem;
+            margin: 0.5rem 0;
+            color: #1e6f5c;
+        }
+        .main-word p {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin: 0;
+        }
+        .category {
+            text-align: center;
+            font-size: 0.9rem;
+            color: #4a627a;
+            background: #e9ecef;
+            display: inline-block;
+            padding: 0.2rem 1rem;
+            border-radius: 30px;
+            margin-top: 0.5rem;
+        }
+        .tiles-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+        .tile {
+            background: #f9f9fc;
+            border-radius: 20px;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            transition: 0.2s;
+            border: 1px solid #e2e8f0;
+        }
+        .nl-word {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 0.8rem;
+            background: #eef2f7;
+            display: inline-block;
+            padding: 0.2rem 0.8rem;
+            border-radius: 40px;
+        }
+        .pt-word {
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            padding: 0.4rem;
+            border-radius: 12px;
+            background: #ffffff;
+            transition: 0.2s;
+            display: inline-block;
+            min-width: 120px;
+        }
+        .blurred-letters {
+            filter: blur(4px);
+        }
+        .revealed {
+            background: #d4e6f1;
+        }
+        .progress {
+            text-align: center;
+            margin-top: 1rem;
+            font-weight: bold;
+            color: #2c6e9e;
+        }
+        .next-btn, .reset-btn, .auth-btn {
+            background: #1e6f5c;
+            color: white;
+            border: none;
+            border-radius: 40px;
+            padding: 0.7rem 1.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            margin: 0.5rem;
+            transition: 0.2s;
+        }
+        .next-btn:hover, .reset-btn:hover, .auth-btn:hover {
+            background: #0e4f40;
+            transform: scale(1.02);
+        }
+        .next-btn:disabled {
+            background: #b0bec5;
+            cursor: not-allowed;
+        }
+        .feedback {
+            text-align: center;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+            color: #2c6e9e;
+        }
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            font-size: 1.2rem;
+        }
+        footer {
+            text-align: center;
+            margin-top: 2rem;
+            font-size: 0.8rem;
+            color: #6c7a89;
+        }
         /* Sterkleuren geforceerd */
         .star {
+            font-size: 1.5rem;
+            cursor: pointer;
+            margin-left: 0.5rem;
+            vertical-align: middle;
             color: #ccc !important;
         }
         .star.favorited {
             color: gold !important;
         }
-
-    </style>
-</head>
-<body>
-    <h1>📖 Synoniemen oefenen (PT-BR → NL)</h1>
-    <div id="app"><div class="loading">⏳ Laden...</div></div>
-    <footer>Data uit Google Sheets | Klik op een Portugees woord (geblurd) om het te ontbluren</footer>
-
-    <!DOCTYPE html>
-<html lang="nl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Synoniemen oefenen - PT-BR → NL</title>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <style>
-        /* (behoud je bestaande CSS, die is ongewijzigd) */
-        * { box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 1rem; background: #f0f7ff; color: #1e2a3a; }
-        h1 { text-align: center; color: #0f3b5c; }
-        .card { background: white; border-radius: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); padding: 1.5rem; margin: 1.5rem 0; }
-        .main-word { text-align: center; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #e2e8f0; }
-        .main-word h2 { font-size: 2rem; margin: 0.5rem 0; color: #1e6f5c; }
-        .main-word p { font-size: 1.2rem; color: #2c3e50; margin: 0; }
-        .category { text-align: center; font-size: 0.9rem; color: #4a627a; background: #e9ecef; display: inline-block; padding: 0.2rem 1rem; border-radius: 30px; margin-top: 0.5rem; }
-        .tiles-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1.5rem 0; }
-        .tile { background: #f9f9fc; border-radius: 20px; padding: 1rem; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.05); transition: 0.2s; border: 1px solid #e2e8f0; }
-        .nl-word { font-size: 1.3rem; font-weight: 600; color: #2c3e50; margin-bottom: 0.8rem; background: #eef2f7; display: inline-block; padding: 0.2rem 0.8rem; border-radius: 40px; }
-        .pt-word { font-size: 1.1rem; font-weight: bold; cursor: pointer; padding: 0.4rem; border-radius: 12px; background: #ffffff; transition: 0.2s; display: inline-block; min-width: 120px; }
-        .blurred-letters { filter: blur(4px); }
-        .revealed { background: #d4e6f1; }
-        .progress { text-align: center; margin-top: 1rem; font-weight: bold; color: #2c6e9e; }
-        .next-btn, .reset-btn, .auth-btn { background: #1e6f5c; color: white; border: none; border-radius: 40px; padding: 0.7rem 1.5rem; font-size: 1rem; cursor: pointer; margin: 0.5rem; transition: 0.2s; }
-        .next-btn:hover, .reset-btn:hover, .auth-btn:hover { background: #0e4f40; transform: scale(1.02); }
-        .next-btn:disabled { background: #b0bec5; cursor: not-allowed; }
-        .feedback { text-align: center; font-size: 0.9rem; margin-top: 1rem; color: #2c6e9e; }
-        .loading { text-align: center; padding: 2rem; font-size: 1.2rem; }
-        footer { text-align: center; margin-top: 2rem; font-size: 0.8rem; color: #6c7a89; }
-        .star { font-size: 1.5rem; cursor: pointer; color: #ccc; transition: 0.2s; margin-left: 0.5rem; vertical-align: middle; }
-        .star.favorited { color: gold; }
-        .header-line { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
-        button { background: none; border: none; }
+        .header-line {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        button {
+            background: none;
+            border: none;
+        }
         @media (max-width: 600px) {
-            .tiles-grid { grid-template-columns: 1fr; }
-            .nl-word { font-size: 1rem; }
-            .pt-word { font-size: 0.9rem; }
-            .main-word h2 { font-size: 1.6rem; }
+            .tiles-grid {
+                grid-template-columns: 1fr;
+            }
+            .nl-word {
+                font-size: 1rem;
+            }
+            .pt-word {
+                font-size: 0.9rem;
+            }
+            .main-word h2 {
+                font-size: 1.6rem;
+            }
+        }
+        .bottom-title {
+            margin-top: 1rem;
+            text-align: center;
+            font-size: 0.9rem;
+            color: #4a627a;
         }
     </style>
 </head>
 <body>
     <h1>📖 Synoniemen oefenen (PT-BR → NL)</h1>
     <div id="app"><div class="loading">⏳ Laden...</div></div>
+    <div class="bottom-title">📖 Synoniemen oefenen (PT-BR → NL)</div>
     <footer>Data uit Google Sheets | Klik op een Portugees woord (geblurd) om het te ontbluren</footer>
 
     <script>
-    // ========== CONFIGURATIE ==========
-    const CLIENT_ID = '37826920170-n9gtl90kfn7tkeq0fn2nhebe7jl6eqjb.apps.googleusercontent.com';
-    const SHEET_ID = '1wHmIeIga8mYQG4h4uuvgPiehn-pc0D7Ptyma9bVnfv0';
-    const SHEET_NAME = 'Blad1';
-    // ====================================
+        // ========== CONFIGURATIE ==========
+        const CLIENT_ID = '37826920170-n9gtl90kfn7tkeq0fn2nhebe7jl6eqjb.apps.googleusercontent.com';
+        const SHEET_ID = '1wHmIeIga8mYQG4h4uuvgPiehn-pc0D7Ptyma9bVnfv0';
+        const SHEET_NAME = 'Blad1';
+        // ====================================
 
-    let tokenClient = null;
-    let accessToken = null;
-    let exercises = [];
-    let currentExercise = null;
-    let currentRevealed = [];
+        let tokenClient = null;
+        let accessToken = null;
+        let exercises = [];
+        let currentExercise = null;
+        let currentRevealed = [];
 
-    // Kolomindex (0‑based) naar letter (bv. 0→A, 25→Z, 26→AA)
-    function colIndexToLetter(index) {
-        let result = '';
-        while (index >= 0) {
-            result = String.fromCharCode(65 + (index % 26)) + result;
-            index = Math.floor(index / 26) - 1;
+        // Kolomindex (0‑based) naar letter
+        function colIndexToLetter(index) {
+            let result = '';
+            while (index >= 0) {
+                result = String.fromCharCode(65 + (index % 26)) + result;
+                index = Math.floor(index / 26) - 1;
+            }
+            return result;
         }
-        return result;
-    }
 
-    function pickNextExercise() {
-        if (!exercises.length) return null;
-        const minScore = Math.min(...exercises.map(ex => ex.score));
-        const candidates = exercises.filter(ex => ex.score === minScore);
-        return candidates[Math.floor(Math.random() * candidates.length)];
-    }
+        function pickNextExercise() {
+            if (!exercises.length) return null;
+            const minScore = Math.min(...exercises.map(ex => ex.score));
+            const candidates = exercises.filter(ex => ex.score === minScore);
+            return candidates[Math.floor(Math.random() * candidates.length)];
+        }
 
-    async function fetchWithTokenRefresh(url, options = {}) {
-        if (!accessToken) throw new Error('Geen toegangstoken');
-        const response = await fetch(url, {
-            ...options,
-            headers: { ...options.headers, 'Authorization': `Bearer ${accessToken}` }
-        });
-        if (response.status === 401) {
-            console.log('Token verlopen, nieuwe aanvragen...');
-            await new Promise((resolve, reject) => {
-                tokenClient.callback = (resp) => {
-                    if (resp.access_token) { accessToken = resp.access_token; resolve(); }
-                    else reject(new Error('Kon token niet vernieuwen'));
-                };
-                tokenClient.requestAccessToken({ prompt: '' });
+        async function fetchWithTokenRefresh(url, options = {}) {
+            if (!accessToken) throw new Error('Geen toegangstoken');
+            const response = await fetch(url, {
+                ...options,
+                headers: { ...options.headers, 'Authorization': `Bearer ${accessToken}` }
             });
-            return fetch(url, { ...options, headers: { ...options.headers, 'Authorization': `Bearer ${accessToken}` } });
-        }
-        return response;
-    }
-
-    async function loadSheetData() {
-        if (!accessToken) throw new Error('Niet ingelogd');
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME)}`;
-        const response = await fetchWithTokenRefresh(url);
-        const data = await response.json();
-        if (!data.values) throw new Error('Geen data gevonden');
-        return parseSheetData(data.values);
-    }
-
-    function parseSheetData(rows) {
-        if (rows.length < 2) return [];
-        const headers = rows[0].map(h => h ? h.trim() : '');
-        const catIdx = headers.findIndex(h => h === 'Categorie');
-        const mainPtIdx = headers.findIndex(h => h === 'hoofd_werkwoord_pt');
-        const mainNlIdx = headers.findIndex(h => h === 'hoofd_vertaling_nl');
-        const scoreIdx = headers.findIndex(h => h === 'Score');
-        const favIdx = headers.findIndex(h => h === 'Favoriet');
-
-        if (mainPtIdx === -1 || mainNlIdx === -1) throw new Error('Verplichte kolommen niet gevonden');
-
-        const scoreColLetter = scoreIdx !== -1 ? colIndexToLetter(scoreIdx) : null;
-        const favColLetter = favIdx !== -1 ? colIndexToLetter(favIdx) : null;
-
-        // Synoniem paren
-        const synonymPairs = [];
-        for (let i = 0; i < headers.length; i++) {
-            if (headers[i].toLowerCase().startsWith('synoniem_pt')) {
-                const nlHeader = headers[i].replace(/pt/i, 'nl');
-                const nlIdx = headers.findIndex(h => h === nlHeader);
-                if (nlIdx !== -1) synonymPairs.push({ ptIdx: i, nlIdx });
+            if (response.status === 401) {
+                console.log('Token verlopen, nieuwe aanvragen...');
+                await new Promise((resolve, reject) => {
+                    tokenClient.callback = (resp) => {
+                        if (resp.access_token) { accessToken = resp.access_token; resolve(); }
+                        else reject(new Error('Kon token niet vernieuwen'));
+                    };
+                    tokenClient.requestAccessToken({ prompt: '' });
+                });
+                return fetch(url, { ...options, headers: { ...options.headers, 'Authorization': `Bearer ${accessToken}` } });
             }
+            return response;
         }
 
-        const list = [];
-        for (let r = 1; r < rows.length; r++) {
-            const row = rows[r];
-            if (!row || row.length === 0) continue;
-            const mainPt = row[mainPtIdx]?.trim();
-            const mainNl = row[mainNlIdx]?.trim();
-            if (!mainPt || !mainNl) continue;
+        async function loadSheetData() {
+            if (!accessToken) throw new Error('Niet ingelogd');
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME)}`;
+            const response = await fetchWithTokenRefresh(url);
+            const data = await response.json();
+            if (!data.values) throw new Error('Geen data gevonden');
+            return parseSheetData(data.values);
+        }
 
-            const category = catIdx !== -1 ? (row[catIdx]?.trim() || '') : '';
-            let score = 0, favorite = 0;
-            if (scoreIdx !== -1 && row[scoreIdx] !== undefined && row[scoreIdx] !== '') {
-                const parsed = parseInt(row[scoreIdx], 10);
-                if (!isNaN(parsed)) score = parsed;
-            }
-            if (favIdx !== -1 && row[favIdx] !== undefined && row[favIdx] !== '') {
-                const parsed = parseInt(row[favIdx], 10);
-                if (!isNaN(parsed)) favorite = parsed;
+        function parseSheetData(rows) {
+            if (rows.length < 2) return [];
+            const headers = rows[0].map(h => h ? h.trim() : '');
+            const catIdx = headers.findIndex(h => h === 'Categorie');
+            const mainPtIdx = headers.findIndex(h => h === 'hoofd_werkwoord_pt');
+            const mainNlIdx = headers.findIndex(h => h === 'hoofd_vertaling_nl');
+            const scoreIdx = headers.findIndex(h => h === 'Score');
+            const favIdx = headers.findIndex(h => h === 'Favoriet');
+
+            if (mainPtIdx === -1 || mainNlIdx === -1) throw new Error('Verplichte kolommen niet gevonden');
+
+            const scoreColLetter = scoreIdx !== -1 ? colIndexToLetter(scoreIdx) : null;
+            const favColLetter = favIdx !== -1 ? colIndexToLetter(favIdx) : null;
+
+            // Synoniem paren
+            const synonymPairs = [];
+            for (let i = 0; i < headers.length; i++) {
+                if (headers[i].toLowerCase().startsWith('synoniem_pt')) {
+                    const nlHeader = headers[i].replace(/pt/i, 'nl');
+                    const nlIdx = headers.findIndex(h => h === nlHeader);
+                    if (nlIdx !== -1) synonymPairs.push({ ptIdx: i, nlIdx });
+                }
             }
 
-            const synonyms = [];
-            for (let pair of synonymPairs) {
-                const pt = row[pair.ptIdx]?.trim();
-                const nl = row[pair.nlIdx]?.trim();
-                if (pt && nl) synonyms.push({ pt, nl });
-            }
-            if (synonyms.length === 0) continue;
+            const list = [];
+            for (let r = 1; r < rows.length; r++) {
+                const row = rows[r];
+                if (!row || row.length === 0) continue;
+                const mainPt = row[mainPtIdx]?.trim();
+                const mainNl = row[mainNlIdx]?.trim();
+                if (!mainPt || !mainNl) continue;
 
-            list.push({
-                sheetRow: r + 1,   // headers = rij 1, data begint bij rij 2
-                mainPt, mainNl, category, score, favorite, synonyms,
-                scoreColLetter, favColLetter
+                const category = catIdx !== -1 ? (row[catIdx]?.trim() || '') : '';
+                let score = 0, favorite = 0;
+                if (scoreIdx !== -1 && row[scoreIdx] !== undefined && row[scoreIdx] !== '') {
+                    const parsed = parseInt(row[scoreIdx], 10);
+                    if (!isNaN(parsed)) score = parsed;
+                }
+                if (favIdx !== -1 && row[favIdx] !== undefined && row[favIdx] !== '') {
+                    const parsed = parseInt(row[favIdx], 10);
+                    if (!isNaN(parsed)) favorite = parsed;
+                }
+
+                const synonyms = [];
+                for (let pair of synonymPairs) {
+                    const pt = row[pair.ptIdx]?.trim();
+                    const nl = row[pair.nlIdx]?.trim();
+                    if (pt && nl) synonyms.push({ pt, nl });
+                }
+                if (synonyms.length === 0) continue;
+
+                list.push({
+                    sheetRow: r + 1,
+                    mainPt, mainNl, category, score, favorite, synonyms,
+                    scoreColLetter, favColLetter
+                });
+            }
+            console.log('Geladen oefeningen:', list.length);
+            return list;
+        }
+
+        async function updateScore(exercise) {
+            if (!accessToken || !exercise.scoreColLetter) return false;
+            const newScore = exercise.score + 1;
+            const range = `'${SHEET_NAME}'!${exercise.scoreColLetter}${exercise.sheetRow}`;
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
+            console.log('Score update range:', range);
+            try {
+                const response = await fetchWithTokenRefresh(url, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ values: [[newScore]] })
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(`HTTP ${response.status}: ${JSON.stringify(err)}`);
+                }
+                exercise.score = newScore;
+                console.log(`Score ${exercise.mainPt} → ${newScore}`);
+                return true;
+            } catch (err) {
+                console.error('Score update mislukt:', err);
+                alert(`Score kon niet worden opgeslagen: ${err.message}`);
+                return false;
+            }
+        }
+
+        async function updateFavorite(exercise, newValue) {
+            if (!accessToken || !exercise.favColLetter) return false;
+            const range = `'${SHEET_NAME}'!${exercise.favColLetter}${exercise.sheetRow}`;
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
+            console.log('Favoriet update range:', range);
+            try {
+                const response = await fetchWithTokenRefresh(url, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ values: [[newValue]] })
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(`HTTP ${response.status}: ${JSON.stringify(err)}`);
+                }
+                exercise.favorite = newValue;
+                console.log(`Favoriet ${exercise.mainPt} → ${newValue}`);
+                return true;
+            } catch (err) {
+                console.error('Favoriet update mislukt:', err);
+                alert(`Favoriet kon niet worden opgeslagen: ${err.message}`);
+                return false;
+            }
+        }
+
+        function renderCurrentExercise() {
+            if (!currentExercise) return;
+            const ex = currentExercise;
+            const revealed = currentRevealed;
+            let tilesHtml = '';
+            ex.synonyms.forEach((syn, idx) => {
+                const isRevealed = revealed[idx];
+                let ptHtml = isRevealed ? syn.pt : `${syn.pt.charAt(0)}<span class="blurred-letters">${syn.pt.slice(1)}</span>`;
+                tilesHtml += `
+                    <div class="tile">
+                        <div class="nl-word">${syn.nl}</div>
+                        <div class="pt-word ${isRevealed ? 'revealed' : ''}" data-idx="${idx}">${ptHtml}</div>
+                    </div>
+                `;
             });
-        }
-        console.log('Geladen oefeningen:', list.length);
-        return list;
-    }
+            const allRevealedFlag = revealed.every(v => v === true);
+            const starClass = ex.favorite === 1 ? 'favorited' : '';
+            console.log(`Favoriet waarde voor ${ex.mainPt}: ${ex.favorite} → klasse: "${starClass}"`);
 
-    async function updateScore(exercise) {
-        if (!accessToken || !exercise.scoreColLetter) return false;
-        const newScore = exercise.score + 1;
-        const range = `'${SHEET_NAME}'!${exercise.scoreColLetter}${exercise.sheetRow}`;
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
-        console.log('Score update range:', range);
-        try {
-            const response = await fetchWithTokenRefresh(url, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ values: [[newScore]] })
-            });
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(`HTTP ${response.status}: ${JSON.stringify(err)}`);
-            }
-            exercise.score = newScore;
-            console.log(`Score ${exercise.mainPt} → ${newScore}`);
-            return true;
-        } catch (err) {
-            console.error('Score update mislukt:', err);
-            alert(`Score kon niet worden opgeslagen: ${err.message}`);
-            return false;
-        }
-    }
-
-    async function updateFavorite(exercise, newValue) {
-        if (!accessToken || !exercise.favColLetter) return false;
-        const range = `'${SHEET_NAME}'!${exercise.favColLetter}${exercise.sheetRow}`;
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
-        console.log('Favoriet update range:', range);
-        try {
-            const response = await fetchWithTokenRefresh(url, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ values: [[newValue]] })
-            });
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(`HTTP ${response.status}: ${JSON.stringify(err)}`);
-            }
-            exercise.favorite = newValue;
-            console.log(`Favoriet ${exercise.mainPt} → ${newValue}`);
-            return true;
-        } catch (err) {
-            console.error('Favoriet update mislukt:', err);
-            alert(`Favoriet kon niet worden opgeslagen: ${err.message}`);
-            return false;
-        }
-    }
-
-    function renderCurrentExercise() {
-        if (!currentExercise) return;
-        const ex = currentExercise;
-        const revealed = currentRevealed;
-        let tilesHtml = '';
-        ex.synonyms.forEach((syn, idx) => {
-            const isRevealed = revealed[idx];
-            let ptHtml = isRevealed ? syn.pt : `${syn.pt.charAt(0)}<span class="blurred-letters">${syn.pt.slice(1)}</span>`;
-            tilesHtml += `
-                <div class="tile">
-                    <div class="nl-word">${syn.nl}</div>
-                    <div class="pt-word ${isRevealed ? 'revealed' : ''}" data-idx="${idx}">${ptHtml}</div>
+            const html = `
+                <div class="card">
+                    <div class="header-line">
+                        <div class="category">📂 ${ex.category || 'Geen categorie'}</div>
+                        <div class="star ${starClass}" id="favoriteStar">⭐</div>
+                    </div>
+                    <div class="main-word">
+                        <h2>${ex.mainPt}</h2>
+                        <p>🇳🇱 ${ex.mainNl}</p>
+                    </div>
+                    <div class="tiles-grid">${tilesHtml}</div>
+                    <div class="progress">Score: ${ex.score} | ${exercises.length} oefeningen totaal</div>
+                    <div style="text-align: center; margin-top: 1.5rem;">
+                        <button class="next-btn" id="nextBtn" ${allRevealedFlag ? '' : 'disabled'}>➡ Volgende oefening</button>
+                        <button class="reset-btn" id="resetBtn">🔄 Nieuwe selectie</button>
+                    </div>
+                    <div class="feedback">${!allRevealedFlag ? 'Klik op de Portugese woorden (geblurd) om ze te ontbluren.' : 'Alle woorden zijn ontblurd! Ga verder.'}</div>
                 </div>
             `;
-        });
-        const allRevealedFlag = revealed.every(v => v === true);
-        // Sterklasse bepalen: als favorite === 1 dan 'favorited', anders leeg
-        const starClass = ex.favorite === 1 ? 'favorited' : '';
-        console.log(`Favoriet waarde voor ${ex.mainPt}: ${ex.favorite} → klasse: "${starClass}"`);
+            document.getElementById('app').innerHTML = html;
 
-        const html = `
-            <div class="card">
-                <div class="header-line">
-                    <div class="category">📂 ${ex.category || 'Geen categorie'}</div>
-                    <div class="star ${starClass}" id="favoriteStar">⭐</div>
-                </div>
-                <div class="main-word">
-                    <h2>${ex.mainPt}</h2>
-                    <p>🇳🇱 ${ex.mainNl}</p>
-                </div>
-                <div class="tiles-grid">${tilesHtml}</div>
-                <div class="progress">Score: ${ex.score} | ${exercises.length} oefeningen totaal</div>
-                <div style="text-align: center; margin-top: 1.5rem;">
-                    <button class="next-btn" id="nextBtn" ${allRevealedFlag ? '' : 'disabled'}>➡ Volgende oefening</button>
-                    <button class="reset-btn" id="resetBtn">🔄 Nieuwe selectie</button>
-                </div>
-                <div class="feedback">${!allRevealedFlag ? 'Klik op de Portugese woorden (geblurd) om ze te ontbluren.' : 'Alle woorden zijn ontblurd! Ga verder.'}</div>
-            </div>
-        `;
-        document.getElementById('app').innerHTML = html;
-
-        document.querySelectorAll('.pt-word').forEach(el => {
-            el.addEventListener('click', (e) => {
-                const idx = parseInt(el.dataset.idx);
-                if (!currentRevealed[idx]) {
-                    currentRevealed[idx] = true;
-                    renderCurrentExercise();
-                }
-                e.stopPropagation();
+            document.querySelectorAll('.pt-word').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    const idx = parseInt(el.dataset.idx);
+                    if (!currentRevealed[idx]) {
+                        currentRevealed[idx] = true;
+                        renderCurrentExercise();
+                    }
+                    e.stopPropagation();
+                });
             });
-        });
 
-        const nextBtn = document.getElementById('nextBtn');
-        if (nextBtn) {
-            nextBtn.addEventListener('click', async () => {
-                if (allRevealedFlag) {
-                    await updateScore(currentExercise);
-                    const nextEx = pickNextExercise();
-                    if (nextEx) {
-                        currentExercise = nextEx;
+            const nextBtn = document.getElementById('nextBtn');
+            if (nextBtn) {
+                nextBtn.addEventListener('click', async () => {
+                    if (allRevealedFlag) {
+                        await updateScore(currentExercise);
+                        const nextEx = pickNextExercise();
+                        if (nextEx) {
+                            currentExercise = nextEx;
+                            currentRevealed = new Array(currentExercise.synonyms.length).fill(false);
+                            renderCurrentExercise();
+                        } else alert('Geen volgende oefening beschikbaar');
+                    }
+                });
+            }
+
+            const resetBtn = document.getElementById('resetBtn');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', () => {
+                    const newEx = pickNextExercise();
+                    if (newEx) {
+                        currentExercise = newEx;
                         currentRevealed = new Array(currentExercise.synonyms.length).fill(false);
                         renderCurrentExercise();
-                    } else alert('Geen volgende oefening beschikbaar');
-                }
+                    }
+                });
+            }
+
+            const star = document.getElementById('favoriteStar');
+            if (star) {
+                star.addEventListener('click', async (e) => {
+                    const newFav = currentExercise.favorite === 1 ? 0 : 1;
+                    if (await updateFavorite(currentExercise, newFav)) {
+                        currentExercise.favorite = newFav;
+                        renderCurrentExercise();
+                    }
+                    e.stopPropagation();
+                });
+            }
+        }
+
+        function initGoogleAuth() {
+            if (typeof google === 'undefined' || !google.accounts) {
+                document.getElementById('app').innerHTML = '<div class="card" style="color:red;">❌ Google Identity Services niet geladen.</div>';
+                return;
+            }
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: 'https://www.googleapis.com/auth/spreadsheets',
+                callback: (resp) => { accessToken = resp.access_token; startApp(); }
             });
+            document.getElementById('app').innerHTML = `
+                <div class="card" style="text-align: center;">
+                    <p>Om toegang te krijgen tot je Google Sheet, moet je inloggen met je Google-account.</p>
+                    <button class="auth-btn" id="loginBtn">🔑 Inloggen met Google</button>
+                </div>
+            `;
+            document.getElementById('loginBtn').onclick = () => tokenClient.requestAccessToken();
         }
 
-        const resetBtn = document.getElementById('resetBtn');
-        if (resetBtn) {
-            resetBtn.addEventListener('click', () => {
-                const newEx = pickNextExercise();
-                if (newEx) {
-                    currentExercise = newEx;
-                    currentRevealed = new Array(currentExercise.synonyms.length).fill(false);
-                    renderCurrentExercise();
-                }
-            });
+        async function startApp() {
+            try {
+                const data = await loadSheetData();
+                if (data.length === 0) throw new Error('Geen geldige oefeningen gevonden');
+                exercises = data;
+                currentExercise = pickNextExercise();
+                currentRevealed = new Array(currentExercise.synonyms.length).fill(false);
+                renderCurrentExercise();
+            } catch (err) {
+                document.getElementById('app').innerHTML = `<div class="card" style="color:red;">❌ Fout: ${err.message}</div>`;
+                console.error(err);
+            }
         }
 
-        const star = document.getElementById('favoriteStar');
-        if (star) {
-            star.addEventListener('click', async (e) => {
-                const newFav = currentExercise.favorite === 1 ? 0 : 1;
-                if (await updateFavorite(currentExercise, newFav)) {
-                    currentExercise.favorite = newFav;
-                    renderCurrentExercise();
-                }
-                e.stopPropagation();
-            });
-        }
-    }
-
-    function initGoogleAuth() {
-        if (typeof google === 'undefined' || !google.accounts) {
-            document.getElementById('app').innerHTML = '<div class="card" style="color:red;">❌ Google Identity Services niet geladen.</div>';
-            return;
-        }
-        tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID,
-            scope: 'https://www.googleapis.com/auth/spreadsheets',
-            callback: (resp) => { accessToken = resp.access_token; startApp(); }
-        });
-        document.getElementById('app').innerHTML = `
-            <div class="card" style="text-align: center;">
-                <p>Om toegang te krijgen tot je Google Sheet, moet je inloggen met je Google-account.</p>
-                <button class="auth-btn" id="loginBtn">🔑 Inloggen met Google</button>
-            </div>
-        `;
-        document.getElementById('loginBtn').onclick = () => tokenClient.requestAccessToken();
-    }
-
-    async function startApp() {
-        try {
-            const data = await loadSheetData();
-            if (data.length === 0) throw new Error('Geen geldige oefeningen gevonden');
-            exercises = data;
-            currentExercise = pickNextExercise();
-            currentRevealed = new Array(currentExercise.synonyms.length).fill(false);
-            renderCurrentExercise();
-        } catch (err) {
-            document.getElementById('app').innerHTML = `<div class="card" style="color:red;">❌ Fout: ${err.message}</div>`;
-            console.error(err);
-        }
-    }
-
-    window.onload = () => initGoogleAuth();
-</script>
-</body>
-</html>
+        window.onload = () => initGoogleAuth();
+    </script>
 </body>
 </html>
