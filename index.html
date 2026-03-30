@@ -136,16 +136,17 @@
             font-size: 0.8rem;
             color: #6c7a89;
         }
-        /* Sterkleuren geforceerd */
+        /* Ster gebruiken we nu als gewoon Unicode-teken, geen emoji */
         .star {
             font-size: 1.5rem;
             cursor: pointer;
             margin-left: 0.5rem;
             vertical-align: middle;
-            color: #ccc !important;
+            color: #ccc;
+            transition: 0.2s;
         }
         .star.favorited {
-            color: gold !important;
+            color: gold;
         }
         .header-line {
             display: flex;
@@ -379,7 +380,7 @@
                 <div class="card">
                     <div class="header-line">
                         <div class="category">📂 ${ex.category || 'Geen categorie'}</div>
-                        <div class="star ${starClass}" id="favoriteStar">⭐</div>
+                        <div class="star ${starClass}" id="favoriteStar">★</div>
                     </div>
                     <div class="main-word">
                         <h2>${ex.mainPt}</h2>
