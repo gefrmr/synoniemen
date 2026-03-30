@@ -49,7 +49,7 @@
     // ========== CONFIGURATIE ==========
     const CLIENT_ID = '37826920170-n9gtl90kfn7tkeq0fn2nhebe7jl6eqjb.apps.googleusercontent.com';
     const SHEET_ID = '1wHmIeIga8mYQG4h4uuvgPiehn-pc0D7Ptyma9bVnfv0';
-    const SHEET_NAME = 'Blad1';
+    const SHEET_NAME = 'Blad1';               // Zorg dat deze exact overeenkomt met de tabbladnaam
     // ====================================
 
     let tokenClient = null;
@@ -58,7 +58,7 @@
     let currentExercise = null;
     let currentRevealed = [];
 
-    // Helper: kies een oefening met de laagste score
+    // Kies een oefening met de laagste score
     function pickNextExercise() {
         if (!exercises.length) return null;
         const minScore = Math.min(...exercises.map(ex => ex.score));
@@ -116,7 +116,7 @@
     function parseSheetData(rows) {
         if (rows.length < 2) return [];
         const headers = rows[0].map(h => h ? h.trim() : '');
-        // indices op basis van exacte kolomnamen (case‑sensitive)
+        // Kolomindices (exacte naam, hoofdlettergevoelig)
         const catIdx = headers.findIndex(h => h === 'Categorie');
         const mainPtIdx = headers.findIndex(h => h === 'hoofd_werkwoord_pt');
         const mainNlIdx = headers.findIndex(h => h === 'hoofd_vertaling_nl');
@@ -127,7 +127,7 @@
             throw new Error('Verplichte kolommen niet gevonden');
         }
 
-        // Synoniem paren
+        // Synoniem paren verzamelen
         const synonymPairs = [];
         for (let i = 0; i < headers.length; i++) {
             if (headers[i].toLowerCase().startsWith('synoniem_pt')) {
@@ -167,8 +167,10 @@
             }
             if (synonyms.length === 0) continue;
 
+            // Bewaar de echte rij in de sheet (header = rij 1, eerste data = rij 2)
+            const sheetRow = r + 1;   // omdat r begint bij 1 (eerste data-rij in array) en headers op rij 1 staan
             exercisesList.push({
-                rowIndex: r,                // 1‑based data‑rij (eerste data‑rij = 1)
+                sheetRow: sheetRow,     // echte rijnummer in Google Sheet
                 mainPt, mainNl, category, score, favorite,
                 synonyms
             });
@@ -177,14 +179,15 @@
         return exercisesList;
     }
 
-    // Score verhogen met 1 (gebruik kolomnaam in A1‑notatie)
+    // Score verhogen met 1
     async function updateScore(exercise) {
         if (!accessToken) return false;
         const newScore = exercise.score + 1;
-        // Gebruik kolomnaam 'Score' (hoofdlettergevoelig) in A1‑notatie
-        const range = `${SHEET_NAME}!Score${exercise.rowIndex + 1}`;
+        // Gebruik quotes rond de sheetnaam voor de veiligheid (bv. 'Blad1'!Score2)
+        const range = `'${SHEET_NAME}'!Score${exercise.sheetRow}`;
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
         const body = { values: [[newScore]] };
+        console.log(`Updating score for ${exercise.mainPt} using range: ${range}`);
         try {
             const response = await fetchWithTokenRefresh(url, {
                 method: 'PUT',
@@ -205,12 +208,13 @@
         }
     }
 
-    // Favoriet status updaten (gebruik kolomnaam 'Favoriet')
+    // Favoriet status updaten
     async function updateFavorite(exercise, newValue) {
         if (!accessToken) return false;
-        const range = `${SHEET_NAME}!Favoriet${exercise.rowIndex + 1}`;
+        const range = `'${SHEET_NAME}'!Favoriet${exercise.sheetRow}`;
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
         const body = { values: [[newValue]] };
+        console.log(`Updating favorite for ${exercise.mainPt} using range: ${range}`);
         try {
             const response = await fetchWithTokenRefresh(url, {
                 method: 'PUT',
