@@ -49,7 +49,7 @@
     // ========== CONFIGURATIE ==========
     const CLIENT_ID = '37826920170-n9gtl90kfn7tkeq0fn2nhebe7jl6eqjb.apps.googleusercontent.com';
     const SHEET_ID = '1wHmIeIga8mYQG4h4uuvgPiehn-pc0D7Ptyma9bVnfv0';
-    const SHEET_NAME = 'Blad1';               // Zorg dat deze exact overeenkomt met de tabbladnaam
+    const SHEET_NAME = 'Blad1';
     // ====================================
 
     let tokenClient = null;
@@ -57,6 +57,16 @@
     let exercises = [];
     let currentExercise = null;
     let currentRevealed = [];
+
+    // Helper: kolomindex (0‑based) naar letter (bv. 0->A, 25->Z, 26->AA)
+    function colIndexToLetter(index) {
+        let result = '';
+        while (index >= 0) {
+            result = String.fromCharCode(65 + (index % 26)) + result;
+            index = Math.floor(index / 26) - 1;
+        }
+        return result;
+    }
 
     // Kies een oefening met de laagste score
     function pickNextExercise() {
@@ -112,11 +122,11 @@
         return parseSheetData(data.values);
     }
 
-    // Data parsen
+    // Data parsen en kolomletters voor Score en Favoriet bewaren
     function parseSheetData(rows) {
         if (rows.length < 2) return [];
         const headers = rows[0].map(h => h ? h.trim() : '');
-        // Kolomindices (exacte naam, hoofdlettergevoelig)
+        // Zoek indices op exacte kolomnamen (hoofdlettergevoelig)
         const catIdx = headers.findIndex(h => h === 'Categorie');
         const mainPtIdx = headers.findIndex(h => h === 'hoofd_werkwoord_pt');
         const mainNlIdx = headers.findIndex(h => h === 'hoofd_vertaling_nl');
@@ -126,6 +136,10 @@
         if (mainPtIdx === -1 || mainNlIdx === -1) {
             throw new Error('Verplichte kolommen niet gevonden');
         }
+
+        // Bereken kolomletters voor Score en Favoriet
+        const scoreColLetter = scoreIdx !== -1 ? colIndexToLetter(scoreIdx) : null;
+        const favColLetter = favIdx !== -1 ? colIndexToLetter(favIdx) : null;
 
         // Synoniem paren verzamelen
         const synonymPairs = [];
@@ -167,24 +181,25 @@
             }
             if (synonyms.length === 0) continue;
 
-            // Bewaar de echte rij in de sheet (header = rij 1, eerste data = rij 2)
-            const sheetRow = r + 1;   // omdat r begint bij 1 (eerste data-rij in array) en headers op rij 1 staan
+            // De echte rij in de sheet: headers = rij 1, eerste data = rij 2
+            const sheetRow = r + 1;
             exercisesList.push({
-                sheetRow: sheetRow,     // echte rijnummer in Google Sheet
+                sheetRow: sheetRow,
                 mainPt, mainNl, category, score, favorite,
-                synonyms
+                synonyms,
+                scoreColLetter,   // bewaar kolomletter voor updates
+                favColLetter
             });
         }
         console.log(`Geladen: ${exercisesList.length} oefeningen`);
         return exercisesList;
     }
 
-    // Score verhogen met 1
+    // Score verhogen met 1 (gebruik kolomletter)
     async function updateScore(exercise) {
-        if (!accessToken) return false;
+        if (!accessToken || !exercise.scoreColLetter) return false;
         const newScore = exercise.score + 1;
-        // Gebruik quotes rond de sheetnaam voor de veiligheid (bv. 'Blad1'!Score2)
-        const range = `'${SHEET_NAME}'!Score${exercise.sheetRow}`;
+        const range = `'${SHEET_NAME}'!${exercise.scoreColLetter}${exercise.sheetRow}`;
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
         const body = { values: [[newScore]] };
         console.log(`Updating score for ${exercise.mainPt} using range: ${range}`);
@@ -208,10 +223,10 @@
         }
     }
 
-    // Favoriet status updaten
+    // Favoriet status updaten (gebruik kolomletter)
     async function updateFavorite(exercise, newValue) {
-        if (!accessToken) return false;
-        const range = `'${SHEET_NAME}'!Favoriet${exercise.sheetRow}`;
+        if (!accessToken || !exercise.favColLetter) return false;
+        const range = `'${SHEET_NAME}'!${exercise.favColLetter}${exercise.sheetRow}`;
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
         const body = { values: [[newValue]] };
         console.log(`Updating favorite for ${exercise.mainPt} using range: ${range}`);
