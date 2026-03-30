@@ -46,342 +46,337 @@
     <footer>Data uit Google Sheets | Klik op een Portugees woord (geblurd) om het te ontbluren</footer>
 
     <script>
-        // Configuratie (vul je eigen gegevens in)
-        const CLIENT_ID = '37826920170-n9gtl90kfn7tkeq0fn2nhebe7jl6eqjb.apps.googleusercontent.com';
-        const SHEET_ID = '1wHmIeIga8mYQG4h4uuvgPiehn-pc0D7Ptyma9bVnfv0';
-        const SHEET_NAME = 'Blad1';
+    // ========== CONFIGURATIE ==========
+    const CLIENT_ID = '37826920170-n9gtl90kfn7tkeq0fn2nhebe7jl6eqjb.apps.googleusercontent.com';
+    const SHEET_ID = '1wHmIeIga8mYQG4h4uuvgPiehn-pc0D7Ptyma9bVnfv0';
+    const SHEET_NAME = 'Blad1';
+    // ====================================
 
-        let tokenClient = null;
-        let accessToken = null;
-        let exercises = [];
-        let currentExercise = null;
-        let currentRevealed = [];
+    let tokenClient = null;
+    let accessToken = null;
+    let exercises = [];
+    let currentExercise = null;
+    let currentRevealed = [];
 
-        // Helper: kolomindex (0‑based) naar letter (bv. 0->A, 25->Z, 26->AA)
-        function colIndexToLetter(index) {
-            let result = '';
-            while (index >= 0) {
-                result = String.fromCharCode(65 + (index % 26)) + result;
-                index = Math.floor(index / 26) - 1;
+    // Helper: kies een oefening met de laagste score
+    function pickNextExercise() {
+        if (!exercises.length) return null;
+        const minScore = Math.min(...exercises.map(ex => ex.score));
+        const candidates = exercises.filter(ex => ex.score === minScore);
+        const randomIndex = Math.floor(Math.random() * candidates.length);
+        return candidates[randomIndex];
+    }
+
+    // API‑call met automatische tokenvernieuwing
+    async function fetchWithTokenRefresh(url, options = {}) {
+        if (!accessToken) throw new Error('Geen toegangstoken');
+        const response = await fetch(url, {
+            ...options,
+            headers: {
+                ...options.headers,
+                'Authorization': `Bearer ${accessToken}`
             }
-            return result;
-        }
-
-        // Kies een oefening met de laagste score
-        function pickNextExercise() {
-            if (!exercises.length) return null;
-            const minScore = Math.min(...exercises.map(ex => ex.score));
-            const candidates = exercises.filter(ex => ex.score === minScore);
-            const randomIndex = Math.floor(Math.random() * candidates.length);
-            return candidates[randomIndex];
-        }
-
-        // API‑call met automatische tokenvernieuwing
-        async function fetchWithTokenRefresh(url, options = {}) {
-            if (!accessToken) throw new Error('Geen toegangstoken');
-            const response = await fetch(url, {
+        });
+        if (response.status === 401) {
+            console.log('Token verlopen, nieuwe aanvragen...');
+            await new Promise((resolve, reject) => {
+                tokenClient.callback = (resp) => {
+                    if (resp.access_token) {
+                        accessToken = resp.access_token;
+                        resolve();
+                    } else {
+                        reject(new Error('Kon token niet vernieuwen'));
+                    }
+                };
+                tokenClient.requestAccessToken({ prompt: '' });
+            });
+            const retryResponse = await fetch(url, {
                 ...options,
                 headers: {
                     ...options.headers,
                     'Authorization': `Bearer ${accessToken}`
                 }
             });
-            if (response.status === 401) {
-                console.log('Token verlopen, nieuwe aanvragen...');
-                await new Promise((resolve, reject) => {
-                    tokenClient.callback = (resp) => {
-                        if (resp.access_token) {
-                            accessToken = resp.access_token;
-                            resolve();
-                        } else {
-                            reject(new Error('Kon token niet vernieuwen'));
-                        }
-                    };
-                    tokenClient.requestAccessToken({ prompt: '' });
-                });
-                const retryResponse = await fetch(url, {
-                    ...options,
-                    headers: {
-                        ...options.headers,
-                        'Authorization': `Bearer ${accessToken}`
-                    }
-                });
-                return retryResponse;
-            }
-            return response;
+            return retryResponse;
+        }
+        return response;
+    }
+
+    // Data ophalen uit sheet
+    async function loadSheetData() {
+        if (!accessToken) throw new Error('Niet ingelogd');
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME)}`;
+        const response = await fetchWithTokenRefresh(url);
+        const data = await response.json();
+        if (!data.values) throw new Error('Geen data gevonden');
+        return parseSheetData(data.values);
+    }
+
+    // Data parsen
+    function parseSheetData(rows) {
+        if (rows.length < 2) return [];
+        const headers = rows[0].map(h => h ? h.trim() : '');
+        // indices op basis van exacte kolomnamen (case‑sensitive)
+        const catIdx = headers.findIndex(h => h === 'Categorie');
+        const mainPtIdx = headers.findIndex(h => h === 'hoofd_werkwoord_pt');
+        const mainNlIdx = headers.findIndex(h => h === 'hoofd_vertaling_nl');
+        const scoreIdx = headers.findIndex(h => h === 'Score');
+        const favIdx = headers.findIndex(h => h === 'Favoriet');
+
+        if (mainPtIdx === -1 || mainNlIdx === -1) {
+            throw new Error('Verplichte kolommen niet gevonden');
         }
 
-        // Data ophalen uit sheet
-        async function loadSheetData() {
-            if (!accessToken) throw new Error('Niet ingelogd');
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME)}`;
-            const response = await fetchWithTokenRefresh(url);
-            const data = await response.json();
-            if (!data.values) throw new Error('Geen data gevonden');
-            return parseSheetData(data.values);
-        }
-
-        // Data parsen met dynamische kolomletters voor updates
-        function parseSheetData(rows) {
-            if (rows.length < 2) return [];
-            const headers = rows[0].map(h => h ? h.trim().toLowerCase() : '');
-            const catIdx = headers.findIndex(h => h === 'categorie');
-            const mainPtIdx = headers.findIndex(h => h === 'hoofd_werkwoord_pt');
-            const mainNlIdx = headers.findIndex(h => h === 'hoofd_vertaling_nl');
-            const scoreIdx = headers.findIndex(h => h === 'score');
-            const favIdx = headers.findIndex(h => h === 'favoriet');
-
-            if (mainPtIdx === -1 || mainNlIdx === -1) {
-                throw new Error('Verplichte kolommen niet gevonden');
-            }
-
-            // Synoniem paren verzamelen
-            const synonymPairs = [];
-            for (let i = 0; i < headers.length; i++) {
-                if (headers[i].startsWith('synoniem_pt')) {
-                    const nlHeader = headers[i].replace('pt', 'nl');
-                    const nlIdx = headers.findIndex(h => h === nlHeader);
-                    if (nlIdx !== -1) {
-                        synonymPairs.push({ ptIdx: i, nlIdx: nlIdx });
-                    }
+        // Synoniem paren
+        const synonymPairs = [];
+        for (let i = 0; i < headers.length; i++) {
+            if (headers[i].toLowerCase().startsWith('synoniem_pt')) {
+                const nlHeader = headers[i].replace(/pt/i, 'nl');
+                const nlIdx = headers.findIndex(h => h === nlHeader);
+                if (nlIdx !== -1) {
+                    synonymPairs.push({ ptIdx: i, nlIdx: nlIdx });
                 }
-            }
-
-            const exercisesList = [];
-            for (let r = 1; r < rows.length; r++) {
-                const row = rows[r];
-                if (!row || row.length === 0) continue;
-                const mainPt = row[mainPtIdx]?.trim();
-                const mainNl = row[mainNlIdx]?.trim();
-                if (!mainPt || !mainNl) continue;
-
-                const category = catIdx !== -1 ? (row[catIdx]?.trim() || '') : '';
-                let score = 0;
-                if (scoreIdx !== -1 && row[scoreIdx] !== undefined && row[scoreIdx] !== '') {
-                    const parsed = parseInt(row[scoreIdx], 10);
-                    if (!isNaN(parsed)) score = parsed;
-                }
-                let favorite = 0;
-                if (favIdx !== -1 && row[favIdx] !== undefined && row[favIdx] !== '') {
-                    const parsed = parseInt(row[favIdx], 10);
-                    if (!isNaN(parsed)) favorite = parsed;
-                }
-
-                const synonyms = [];
-                for (let pair of synonymPairs) {
-                    const pt = row[pair.ptIdx]?.trim();
-                    const nl = row[pair.nlIdx]?.trim();
-                    if (pt && nl) synonyms.push({ pt, nl });
-                }
-                if (synonyms.length === 0) continue;
-
-                exercisesList.push({
-                    rowIndex: r,                // 1‑based rij in sheet (eerste data‑rij = 1)
-                    mainPt, mainNl, category, score, favorite,
-                    synonyms,
-                    // Bewaar kolomindices voor updates
-                    scoreColLetter: scoreIdx !== -1 ? colIndexToLetter(scoreIdx) : null,
-                    favColLetter: favIdx !== -1 ? colIndexToLetter(favIdx) : null
-                });
-            }
-            console.log(`Geladen: ${exercisesList.length} oefeningen`);
-            return exercisesList;
-        }
-
-        // Score verhogen met 1
-        async function updateScore(exercise) {
-            if (!accessToken || !exercise.scoreColLetter) return false;
-            const newScore = exercise.score + 1;
-            const range = `${SHEET_NAME}!${exercise.scoreColLetter}${exercise.rowIndex + 1}`;
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
-            const body = { values: [[newScore]] };
-            try {
-                const response = await fetchWithTokenRefresh(url, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
-                if (!response.ok) {
-                    const errData = await response.json();
-                    throw new Error(`HTTP ${response.status}: ${JSON.stringify(errData)}`);
-                }
-                exercise.score = newScore;
-                console.log(`Score voor ${exercise.mainPt} bijgewerkt naar ${newScore}`);
-                return true;
-            } catch (err) {
-                console.error('Score update mislukt:', err);
-                alert(`Score kon niet worden opgeslagen: ${err.message}`);
-                return false;
             }
         }
 
-        // Favoriet status updaten
-        async function updateFavorite(exercise, newValue) {
-            if (!accessToken || !exercise.favColLetter) return false;
-            const range = `${SHEET_NAME}!${exercise.favColLetter}${exercise.rowIndex + 1}`;
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
-            const body = { values: [[newValue]] };
-            try {
-                const response = await fetchWithTokenRefresh(url, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
-                if (!response.ok) {
-                    const errData = await response.json();
-                    throw new Error(`HTTP ${response.status}: ${JSON.stringify(errData)}`);
-                }
-                exercise.favorite = newValue;
-                console.log(`Favoriet voor ${exercise.mainPt} bijgewerkt naar ${newValue}`);
-                return true;
-            } catch (err) {
-                console.error('Favoriet update mislukt:', err);
-                alert(`Favoriet kon niet worden opgeslagen: ${err.message}`);
-                return false;
-            }
-        }
+        const exercisesList = [];
+        for (let r = 1; r < rows.length; r++) {
+            const row = rows[r];
+            if (!row || row.length === 0) continue;
+            const mainPt = row[mainPtIdx]?.trim();
+            const mainNl = row[mainNlIdx]?.trim();
+            if (!mainPt || !mainNl) continue;
 
-        // Render de huidige oefening
-        function renderCurrentExercise() {
-            if (!currentExercise) return;
-            const ex = currentExercise;
-            const revealed = currentRevealed;
-            let tilesHtml = '';
-            ex.synonyms.forEach((syn, idx) => {
-                const isRevealed = revealed[idx];
-                let ptHtml = '';
-                if (isRevealed) {
-                    ptHtml = syn.pt;
-                } else {
-                    const firstLetter = syn.pt.charAt(0);
-                    const rest = syn.pt.slice(1);
-                    ptHtml = `${firstLetter}<span class="blurred-letters">${rest}</span>`;
-                }
-                tilesHtml += `
-                    <div class="tile">
-                        <div class="nl-word">${syn.nl}</div>
-                        <div class="pt-word ${isRevealed ? 'revealed' : ''}" data-idx="${idx}">${ptHtml}</div>
-                    </div>
-                `;
+            const category = catIdx !== -1 ? (row[catIdx]?.trim() || '') : '';
+            let score = 0;
+            if (scoreIdx !== -1 && row[scoreIdx] !== undefined && row[scoreIdx] !== '') {
+                const parsed = parseInt(row[scoreIdx], 10);
+                if (!isNaN(parsed)) score = parsed;
+            }
+            let favorite = 0;
+            if (favIdx !== -1 && row[favIdx] !== undefined && row[favIdx] !== '') {
+                const parsed = parseInt(row[favIdx], 10);
+                if (!isNaN(parsed)) favorite = parsed;
+            }
+
+            const synonyms = [];
+            for (let pair of synonymPairs) {
+                const pt = row[pair.ptIdx]?.trim();
+                const nl = row[pair.nlIdx]?.trim();
+                if (pt && nl) synonyms.push({ pt, nl });
+            }
+            if (synonyms.length === 0) continue;
+
+            exercisesList.push({
+                rowIndex: r,                // 1‑based data‑rij (eerste data‑rij = 1)
+                mainPt, mainNl, category, score, favorite,
+                synonyms
             });
-            const allRevealedFlag = revealed.every(v => v === true);
-            const starClass = ex.favorite === 1 ? 'favorited' : '';
-            const html = `
-                <div class="card">
-                    <div class="header-line">
-                        <div class="category">📂 ${ex.category || 'Geen categorie'}</div>
-                        <div class="star ${starClass}" id="favoriteStar">⭐</div>
-                    </div>
-                    <div class="main-word">
-                        <h2>${ex.mainPt}</h2>
-                        <p>🇳🇱 ${ex.mainNl}</p>
-                    </div>
-                    <div class="tiles-grid">${tilesHtml}</div>
-                    <div class="progress">Score: ${ex.score} | ${exercises.length} oefeningen totaal</div>
-                    <div style="text-align: center; margin-top: 1.5rem;">
-                        <button class="next-btn" id="nextBtn" ${allRevealedFlag ? '' : 'disabled'}>➡ Volgende oefening</button>
-                        <button class="reset-btn" id="resetBtn">🔄 Nieuwe selectie</button>
-                    </div>
-                    <div class="feedback">${!allRevealedFlag ? 'Klik op de Portugese woorden (geblurd) om ze te ontbluren.' : 'Alle woorden zijn ontblurd! Ga verder.'}</div>
+        }
+        console.log(`Geladen: ${exercisesList.length} oefeningen`);
+        return exercisesList;
+    }
+
+    // Score verhogen met 1 (gebruik kolomnaam in A1‑notatie)
+    async function updateScore(exercise) {
+        if (!accessToken) return false;
+        const newScore = exercise.score + 1;
+        // Gebruik kolomnaam 'Score' (hoofdlettergevoelig) in A1‑notatie
+        const range = `${SHEET_NAME}!Score${exercise.rowIndex + 1}`;
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
+        const body = { values: [[newScore]] };
+        try {
+            const response = await fetchWithTokenRefresh(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(`HTTP ${response.status}: ${JSON.stringify(errData)}`);
+            }
+            exercise.score = newScore;
+            console.log(`Score voor ${exercise.mainPt} bijgewerkt naar ${newScore}`);
+            return true;
+        } catch (err) {
+            console.error('Score update mislukt:', err);
+            alert(`Score kon niet worden opgeslagen: ${err.message}`);
+            return false;
+        }
+    }
+
+    // Favoriet status updaten (gebruik kolomnaam 'Favoriet')
+    async function updateFavorite(exercise, newValue) {
+        if (!accessToken) return false;
+        const range = `${SHEET_NAME}!Favoriet${exercise.rowIndex + 1}`;
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
+        const body = { values: [[newValue]] };
+        try {
+            const response = await fetchWithTokenRefresh(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(`HTTP ${response.status}: ${JSON.stringify(errData)}`);
+            }
+            exercise.favorite = newValue;
+            console.log(`Favoriet voor ${exercise.mainPt} bijgewerkt naar ${newValue}`);
+            return true;
+        } catch (err) {
+            console.error('Favoriet update mislukt:', err);
+            alert(`Favoriet kon niet worden opgeslagen: ${err.message}`);
+            return false;
+        }
+    }
+
+    // Render huidige oefening
+    function renderCurrentExercise() {
+        if (!currentExercise) return;
+        const ex = currentExercise;
+        const revealed = currentRevealed;
+        let tilesHtml = '';
+        ex.synonyms.forEach((syn, idx) => {
+            const isRevealed = revealed[idx];
+            let ptHtml = '';
+            if (isRevealed) {
+                ptHtml = syn.pt;
+            } else {
+                const firstLetter = syn.pt.charAt(0);
+                const rest = syn.pt.slice(1);
+                ptHtml = `${firstLetter}<span class="blurred-letters">${rest}</span>`;
+            }
+            tilesHtml += `
+                <div class="tile">
+                    <div class="nl-word">${syn.nl}</div>
+                    <div class="pt-word ${isRevealed ? 'revealed' : ''}" data-idx="${idx}">${ptHtml}</div>
                 </div>
             `;
-            document.getElementById('app').innerHTML = html;
+        });
+        const allRevealedFlag = revealed.every(v => v === true);
+        const starClass = ex.favorite === 1 ? 'favorited' : '';
+        const html = `
+            <div class="card">
+                <div class="header-line">
+                    <div class="category">📂 ${ex.category || 'Geen categorie'}</div>
+                    <div class="star ${starClass}" id="favoriteStar">⭐</div>
+                </div>
+                <div class="main-word">
+                    <h2>${ex.mainPt}</h2>
+                    <p>🇳🇱 ${ex.mainNl}</p>
+                </div>
+                <div class="tiles-grid">${tilesHtml}</div>
+                <div class="progress">Score: ${ex.score} | ${exercises.length} oefeningen totaal</div>
+                <div style="text-align: center; margin-top: 1.5rem;">
+                    <button class="next-btn" id="nextBtn" ${allRevealedFlag ? '' : 'disabled'}>➡ Volgende oefening</button>
+                    <button class="reset-btn" id="resetBtn">🔄 Nieuwe selectie</button>
+                </div>
+                <div class="feedback">${!allRevealedFlag ? 'Klik op de Portugese woorden (geblurd) om ze te ontbluren.' : 'Alle woorden zijn ontblurd! Ga verder.'}</div>
+            </div>
+        `;
+        document.getElementById('app').innerHTML = html;
 
-            // Klik op Portugese woorden
-            document.querySelectorAll('.pt-word').forEach(el => {
-                el.addEventListener('click', (e) => {
-                    const idx = parseInt(el.dataset.idx);
-                    if (!currentRevealed[idx]) {
-                        currentRevealed[idx] = true;
-                        renderCurrentExercise();
-                    }
-                    e.stopPropagation();
-                });
+        // Klik op Portugese woorden
+        document.querySelectorAll('.pt-word').forEach(el => {
+            el.addEventListener('click', (e) => {
+                const idx = parseInt(el.dataset.idx);
+                if (!currentRevealed[idx]) {
+                    currentRevealed[idx] = true;
+                    renderCurrentExercise();
+                }
+                e.stopPropagation();
             });
+        });
 
-            // Volgende knop
-            const nextBtn = document.getElementById('nextBtn');
-            if (nextBtn) {
-                nextBtn.addEventListener('click', async () => {
-                    if (allRevealedFlag) {
-                        await updateScore(currentExercise);
-                        const nextEx = pickNextExercise();
-                        if (nextEx) {
-                            currentExercise = nextEx;
-                            currentRevealed = new Array(currentExercise.synonyms.length).fill(false);
-                            renderCurrentExercise();
-                        } else {
-                            alert('Geen volgende oefening beschikbaar');
-                        }
-                    }
-                });
-            }
-
-            // Reset knop
-            const resetBtn = document.getElementById('resetBtn');
-            if (resetBtn) {
-                resetBtn.addEventListener('click', () => {
-                    const newEx = pickNextExercise();
-                    if (newEx) {
-                        currentExercise = newEx;
+        // Volgende knop
+        const nextBtn = document.getElementById('nextBtn');
+        if (nextBtn) {
+            nextBtn.addEventListener('click', async () => {
+                if (allRevealedFlag) {
+                    await updateScore(currentExercise);
+                    const nextEx = pickNextExercise();
+                    if (nextEx) {
+                        currentExercise = nextEx;
                         currentRevealed = new Array(currentExercise.synonyms.length).fill(false);
                         renderCurrentExercise();
+                    } else {
+                        alert('Geen volgende oefening beschikbaar');
                     }
-                });
-            }
-
-            // Sterretje voor favoriet
-            const star = document.getElementById('favoriteStar');
-            if (star) {
-                star.addEventListener('click', async (e) => {
-                    const newFav = currentExercise.favorite === 1 ? 0 : 1;
-                    const success = await updateFavorite(currentExercise, newFav);
-                    if (success) {
-                        currentExercise.favorite = newFav;
-                        renderCurrentExercise();
-                    }
-                    e.stopPropagation();
-                });
-            }
-        }
-
-        // Inloggen met Google
-        function initGoogleAuth() {
-            tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: 'https://www.googleapis.com/auth/spreadsheets',
-                callback: (tokenResponse) => {
-                    accessToken = tokenResponse.access_token;
-                    startApp();
-                },
-            });
-            document.getElementById('app').innerHTML = `
-                <div class="card" style="text-align: center;">
-                    <p>Om toegang te krijgen tot je Google Sheet, moet je inloggen met je Google-account.</p>
-                    <button class="auth-btn" id="loginBtn">🔑 Inloggen met Google</button>
-                </div>
-            `;
-            document.getElementById('loginBtn').addEventListener('click', () => {
-                tokenClient.requestAccessToken();
+                }
             });
         }
 
-        async function startApp() {
-            try {
-                const data = await loadSheetData();
-                if (data.length === 0) throw new Error('Geen geldige oefeningen gevonden');
-                exercises = data;
-                currentExercise = pickNextExercise();
-                if (!currentExercise) throw new Error('Geen oefening geselecteerd');
-                currentRevealed = new Array(currentExercise.synonyms.length).fill(false);
-                renderCurrentExercise();
-            } catch (err) {
-                document.getElementById('app').innerHTML = `<div class="card" style="color:red;">❌ Fout: ${err.message}<br>Controleer de console (F12) voor details.</div>`;
-                console.error(err);
-            }
+        // Reset knop
+        const resetBtn = document.getElementById('resetBtn');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                const newEx = pickNextExercise();
+                if (newEx) {
+                    currentExercise = newEx;
+                    currentRevealed = new Array(currentExercise.synonyms.length).fill(false);
+                    renderCurrentExercise();
+                }
+            });
         }
 
-        window.onload = () => initGoogleAuth();
-    </script>
+        // Sterretje voor favoriet
+        const star = document.getElementById('favoriteStar');
+        if (star) {
+            star.addEventListener('click', async (e) => {
+                const newFav = currentExercise.favorite === 1 ? 0 : 1;
+                const success = await updateFavorite(currentExercise, newFav);
+                if (success) {
+                    currentExercise.favorite = newFav;
+                    renderCurrentExercise();
+                }
+                e.stopPropagation();
+            });
+        }
+    }
+
+    // Inloggen met Google
+    function initGoogleAuth() {
+        if (typeof google === 'undefined' || !google.accounts) {
+            console.error('Google Identity Services niet geladen');
+            document.getElementById('app').innerHTML = '<div class="card" style="color:red;">❌ Fout: Google Identity Services kon niet laden.</div>';
+            return;
+        }
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: 'https://www.googleapis.com/auth/spreadsheets',
+            callback: (tokenResponse) => {
+                accessToken = tokenResponse.access_token;
+                startApp();
+            },
+        });
+        document.getElementById('app').innerHTML = `
+            <div class="card" style="text-align: center;">
+                <p>Om toegang te krijgen tot je Google Sheet, moet je inloggen met je Google-account.</p>
+                <button class="auth-btn" id="loginBtn">🔑 Inloggen met Google</button>
+            </div>
+        `;
+        document.getElementById('loginBtn').addEventListener('click', () => {
+            tokenClient.requestAccessToken();
+        });
+    }
+
+    async function startApp() {
+        try {
+            const data = await loadSheetData();
+            if (data.length === 0) throw new Error('Geen geldige oefeningen gevonden');
+            exercises = data;
+            currentExercise = pickNextExercise();
+            if (!currentExercise) throw new Error('Geen oefening geselecteerd');
+            currentRevealed = new Array(currentExercise.synonyms.length).fill(false);
+            renderCurrentExercise();
+        } catch (err) {
+            document.getElementById('app').innerHTML = `<div class="card" style="color:red;">❌ Fout: ${err.message}<br>Controleer de console (F12) voor details.</div>`;
+            console.error(err);
+        }
+    }
+
+    window.onload = () => initGoogleAuth();
+</script>
 </body>
 </html>
