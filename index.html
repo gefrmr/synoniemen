@@ -4,10 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Synoniemen oefenen - PT-BR → NL</title>
-    <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
-        /* (je bestaande CSS blijft ongewijzigd, ik herhaal hem hier voor de volledigheid) */
+        /* (CSS blijft hetzelfde, we laten het hier weg voor de leesbaarheid, maar in je definitieve bestand zet je de volledige CSS zoals eerder) */
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 1rem; background: #f0f7ff; color: #1e2a3a; }
         h1 { text-align: center; color: #0f3b5c; }
@@ -17,7 +16,7 @@
         .main-word p { font-size: 1.2rem; color: #2c3e50; margin: 0; }
         .category { text-align: center; font-size: 0.9rem; color: #4a627a; background: #e9ecef; display: inline-block; padding: 0.2rem 1rem; border-radius: 30px; margin-top: 0.5rem; }
         .tiles-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1.5rem 0; }
-        .tile { background: #f9f9fc; border-radius: 20px; padding: 1rem; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.05); transition: 0.2s; border: 1px solid #e2e8f0; position: relative; }
+        .tile { background: #f9f9fc; border-radius: 20px; padding: 1rem; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.05); transition: 0.2s; border: 1px solid #e2e8f0; }
         .nl-word { font-size: 1.3rem; font-weight: 600; color: #2c3e50; margin-bottom: 0.8rem; background: #eef2f7; display: inline-block; padding: 0.2rem 0.8rem; border-radius: 40px; }
         .pt-word { font-size: 1.1rem; font-weight: bold; cursor: pointer; padding: 0.4rem; border-radius: 12px; background: #ffffff; transition: 0.2s; display: inline-block; min-width: 120px; }
         .blurred-letters { filter: blur(4px); }
@@ -43,19 +42,14 @@
 </head>
 <body>
     <h1>📖 Synoniemen oefenen (PT-BR → NL)</h1>
-    <div id="app">
-        <div class="loading">⏳ Laden...</div>
-    </div>
-    <footer>
-        Data uit Google Sheets | Klik op een Portugees woord (geblurd) om het te ontbluren
-    </footer>
+    <div id="app"><div class="loading">⏳ Laden...</div></div>
+    <footer>Data uit Google Sheets | Klik op een Portugees woord (geblurd) om het te ontbluren</footer>
 
     <script>
-        // ========== CONFIGURATIE ==========
+        // Configuratie (vul je eigen gegevens in)
         const CLIENT_ID = '37826920170-n9gtl90kfn7tkeq0fn2nhebe7jl6eqjb.apps.googleusercontent.com';
         const SHEET_ID = '1wHmIeIga8mYQG4h4uuvgPiehn-pc0D7Ptyma9bVnfv0';
         const SHEET_NAME = 'Blad1';
-        // ====================================
 
         let tokenClient = null;
         let accessToken = null;
@@ -63,21 +57,26 @@
         let currentExercise = null;
         let currentRevealed = [];
 
-        // Helper: random integer
-        function randomInt(max) {
-            return Math.floor(Math.random() * max);
+        // Helper: kolomindex (0‑based) naar letter (bv. 0->A, 25->Z, 26->AA)
+        function colIndexToLetter(index) {
+            let result = '';
+            while (index >= 0) {
+                result = String.fromCharCode(65 + (index % 26)) + result;
+                index = Math.floor(index / 26) - 1;
+            }
+            return result;
         }
 
-        // Kies een nieuwe oefening op basis van laagste score
+        // Kies een oefening met de laagste score
         function pickNextExercise() {
             if (!exercises.length) return null;
             const minScore = Math.min(...exercises.map(ex => ex.score));
             const candidates = exercises.filter(ex => ex.score === minScore);
-            const randomIndex = randomInt(candidates.length);
+            const randomIndex = Math.floor(Math.random() * candidates.length);
             return candidates[randomIndex];
         }
 
-        // API-call met automatische tokenvernieuwing bij 401
+        // API‑call met automatische tokenvernieuwing
         async function fetchWithTokenRefresh(url, options = {}) {
             if (!accessToken) throw new Error('Geen toegangstoken');
             const response = await fetch(url, {
@@ -88,7 +87,6 @@
                 }
             });
             if (response.status === 401) {
-                // Token verlopen, probeer een nieuwe te halen (stil)
                 console.log('Token verlopen, nieuwe aanvragen...');
                 await new Promise((resolve, reject) => {
                     tokenClient.callback = (resp) => {
@@ -101,7 +99,6 @@
                     };
                     tokenClient.requestAccessToken({ prompt: '' });
                 });
-                // Opnieuw proberen met nieuwe token
                 const retryResponse = await fetch(url, {
                     ...options,
                     headers: {
@@ -114,7 +111,7 @@
             return response;
         }
 
-        // Laad alle data uit de sheet
+        // Data ophalen uit sheet
         async function loadSheetData() {
             if (!accessToken) throw new Error('Niet ingelogd');
             const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME)}`;
@@ -124,7 +121,7 @@
             return parseSheetData(data.values);
         }
 
-        // Parse sheet data
+        // Data parsen met dynamische kolomletters voor updates
         function parseSheetData(rows) {
             if (rows.length < 2) return [];
             const headers = rows[0].map(h => h ? h.trim().toLowerCase() : '');
@@ -133,9 +130,12 @@
             const mainNlIdx = headers.findIndex(h => h === 'hoofd_vertaling_nl');
             const scoreIdx = headers.findIndex(h => h === 'score');
             const favIdx = headers.findIndex(h => h === 'favoriet');
+
             if (mainPtIdx === -1 || mainNlIdx === -1) {
                 throw new Error('Verplichte kolommen niet gevonden');
             }
+
+            // Synoniem paren verzamelen
             const synonymPairs = [];
             for (let i = 0; i < headers.length; i++) {
                 if (headers[i].startsWith('synoniem_pt')) {
@@ -146,6 +146,7 @@
                     }
                 }
             }
+
             const exercisesList = [];
             for (let r = 1; r < rows.length; r++) {
                 const row = rows[r];
@@ -153,8 +154,8 @@
                 const mainPt = row[mainPtIdx]?.trim();
                 const mainNl = row[mainNlIdx]?.trim();
                 if (!mainPt || !mainNl) continue;
+
                 const category = catIdx !== -1 ? (row[catIdx]?.trim() || '') : '';
-                // Veilige parsing van score en favoriet
                 let score = 0;
                 if (scoreIdx !== -1 && row[scoreIdx] !== undefined && row[scoreIdx] !== '') {
                     const parsed = parseInt(row[scoreIdx], 10);
@@ -165,29 +166,33 @@
                     const parsed = parseInt(row[favIdx], 10);
                     if (!isNaN(parsed)) favorite = parsed;
                 }
+
                 const synonyms = [];
                 for (let pair of synonymPairs) {
                     const pt = row[pair.ptIdx]?.trim();
                     const nl = row[pair.nlIdx]?.trim();
-                    if (pt && nl) {
-                        synonyms.push({ pt, nl });
-                    }
+                    if (pt && nl) synonyms.push({ pt, nl });
                 }
                 if (synonyms.length === 0) continue;
+
                 exercisesList.push({
-                    rowIndex: r,           // 1‑gebaseerde rij in sheet (eerste data rij = 1)
+                    rowIndex: r,                // 1‑based rij in sheet (eerste data‑rij = 1)
                     mainPt, mainNl, category, score, favorite,
-                    synonyms
+                    synonyms,
+                    // Bewaar kolomindices voor updates
+                    scoreColLetter: scoreIdx !== -1 ? colIndexToLetter(scoreIdx) : null,
+                    favColLetter: favIdx !== -1 ? colIndexToLetter(favIdx) : null
                 });
             }
+            console.log(`Geladen: ${exercisesList.length} oefeningen`);
             return exercisesList;
         }
 
-        // Update score (verhoog met 1)
+        // Score verhogen met 1
         async function updateScore(exercise) {
-            if (!accessToken) return false;
+            if (!accessToken || !exercise.scoreColLetter) return false;
             const newScore = exercise.score + 1;
-            const range = `${SHEET_NAME}!Score${exercise.rowIndex + 1}`; // +1 omdat headers rij 1 is
+            const range = `${SHEET_NAME}!${exercise.scoreColLetter}${exercise.rowIndex + 1}`;
             const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
             const body = { values: [[newScore]] };
             try {
@@ -196,20 +201,24 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(`HTTP ${response.status}: ${JSON.stringify(errData)}`);
+                }
                 exercise.score = newScore;
                 console.log(`Score voor ${exercise.mainPt} bijgewerkt naar ${newScore}`);
                 return true;
             } catch (err) {
-                console.error('Score update mislukt', err);
+                console.error('Score update mislukt:', err);
+                alert(`Score kon niet worden opgeslagen: ${err.message}`);
                 return false;
             }
         }
 
-        // Update favoriet status
+        // Favoriet status updaten
         async function updateFavorite(exercise, newValue) {
-            if (!accessToken) return false;
-            const range = `${SHEET_NAME}!Favoriet${exercise.rowIndex + 1}`;
+            if (!accessToken || !exercise.favColLetter) return false;
+            const range = `${SHEET_NAME}!${exercise.favColLetter}${exercise.rowIndex + 1}`;
             const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
             const body = { values: [[newValue]] };
             try {
@@ -218,44 +227,44 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(`HTTP ${response.status}: ${JSON.stringify(errData)}`);
+                }
                 exercise.favorite = newValue;
                 console.log(`Favoriet voor ${exercise.mainPt} bijgewerkt naar ${newValue}`);
                 return true;
             } catch (err) {
-                console.error('Favoriet update mislukt', err);
+                console.error('Favoriet update mislukt:', err);
+                alert(`Favoriet kon niet worden opgeslagen: ${err.message}`);
                 return false;
             }
         }
 
-        // Render huidige oefening
+        // Render de huidige oefening
         function renderCurrentExercise() {
             if (!currentExercise) return;
             const ex = currentExercise;
-            const synonyms = ex.synonyms;
             const revealed = currentRevealed;
             let tilesHtml = '';
-            synonyms.forEach((syn, idx) => {
+            ex.synonyms.forEach((syn, idx) => {
                 const isRevealed = revealed[idx];
-                let ptDisplayHtml = '';
+                let ptHtml = '';
                 if (isRevealed) {
-                    ptDisplayHtml = syn.pt;
+                    ptHtml = syn.pt;
                 } else {
                     const firstLetter = syn.pt.charAt(0);
-                    const restLetters = syn.pt.slice(1);
-                    ptDisplayHtml = `${firstLetter}<span class="blurred-letters">${restLetters}</span>`;
+                    const rest = syn.pt.slice(1);
+                    ptHtml = `${firstLetter}<span class="blurred-letters">${rest}</span>`;
                 }
                 tilesHtml += `
                     <div class="tile">
                         <div class="nl-word">${syn.nl}</div>
-                        <div class="pt-word ${isRevealed ? 'revealed' : ''}" data-idx="${idx}">
-                            ${ptDisplayHtml}
-                        </div>
+                        <div class="pt-word ${isRevealed ? 'revealed' : ''}" data-idx="${idx}">${ptHtml}</div>
                     </div>
                 `;
             });
             const allRevealedFlag = revealed.every(v => v === true);
-            const nextDisabled = !allRevealedFlag;
             const starClass = ex.favorite === 1 ? 'favorited' : '';
             const html = `
                 <div class="card">
@@ -267,25 +276,18 @@
                         <h2>${ex.mainPt}</h2>
                         <p>🇳🇱 ${ex.mainNl}</p>
                     </div>
-                    <div class="tiles-grid">
-                        ${tilesHtml}
-                    </div>
-                    <div class="progress">
-                        Score: ${ex.score} | ${exercises.length} oefeningen totaal
-                    </div>
+                    <div class="tiles-grid">${tilesHtml}</div>
+                    <div class="progress">Score: ${ex.score} | ${exercises.length} oefeningen totaal</div>
                     <div style="text-align: center; margin-top: 1.5rem;">
-                        <button class="next-btn" id="nextBtn" ${nextDisabled ? 'disabled' : ''}>➡ Volgende oefening</button>
+                        <button class="next-btn" id="nextBtn" ${allRevealedFlag ? '' : 'disabled'}>➡ Volgende oefening</button>
                         <button class="reset-btn" id="resetBtn">🔄 Nieuwe selectie</button>
                     </div>
-                    <div class="feedback" id="feedback">
-                        ${!allRevealedFlag ? 'Klik op de Portugese woorden (geblurd) om ze te ontbluren.' : 'Alle woorden zijn ontblurd! Ga verder.'}
-                    </div>
+                    <div class="feedback">${!allRevealedFlag ? 'Klik op de Portugese woorden (geblurd) om ze te ontbluren.' : 'Alle woorden zijn ontblurd! Ga verder.'}</div>
                 </div>
             `;
-            const app = document.getElementById('app');
-            app.innerHTML = html;
+            document.getElementById('app').innerHTML = html;
 
-            // Klik handlers voor Portugese woorden
+            // Klik op Portugese woorden
             document.querySelectorAll('.pt-word').forEach(el => {
                 el.addEventListener('click', (e) => {
                     const idx = parseInt(el.dataset.idx);
@@ -302,9 +304,7 @@
             if (nextBtn) {
                 nextBtn.addEventListener('click', async () => {
                     if (allRevealedFlag) {
-                        // Update score in sheet en lokaal
                         await updateScore(currentExercise);
-                        // Kies volgende oefening (op basis van bijgewerkte scores)
                         const nextEx = pickNextExercise();
                         if (nextEx) {
                             currentExercise = nextEx;
@@ -317,7 +317,7 @@
                 });
             }
 
-            // Reset / nieuwe selectie knop
+            // Reset knop
             const resetBtn = document.getElementById('resetBtn');
             if (resetBtn) {
                 resetBtn.addEventListener('click', () => {
@@ -337,11 +337,8 @@
                     const newFav = currentExercise.favorite === 1 ? 0 : 1;
                     const success = await updateFavorite(currentExercise, newFav);
                     if (success) {
-                        // Update lokaal en herteken
                         currentExercise.favorite = newFav;
                         renderCurrentExercise();
-                    } else {
-                        alert('Favoriet kon niet worden opgeslagen. Controleer je internetverbinding en of je nog bent ingelogd.');
                     }
                     e.stopPropagation();
                 });
@@ -355,13 +352,10 @@
                 scope: 'https://www.googleapis.com/auth/spreadsheets',
                 callback: (tokenResponse) => {
                     accessToken = tokenResponse.access_token;
-                    // Start app na inloggen
                     startApp();
                 },
             });
-            // Toon login knop
-            const appDiv = document.getElementById('app');
-            appDiv.innerHTML = `
+            document.getElementById('app').innerHTML = `
                 <div class="card" style="text-align: center;">
                     <p>Om toegang te krijgen tot je Google Sheet, moet je inloggen met je Google-account.</p>
                     <button class="auth-btn" id="loginBtn">🔑 Inloggen met Google</button>
@@ -382,14 +376,12 @@
                 currentRevealed = new Array(currentExercise.synonyms.length).fill(false);
                 renderCurrentExercise();
             } catch (err) {
-                document.getElementById('app').innerHTML = `<div class="card" style="color:red;">❌ Fout: ${err.message}<br>Controleer of je ingelogd bent en of de sheet leesbaar is.</div>`;
+                document.getElementById('app').innerHTML = `<div class="card" style="color:red;">❌ Fout: ${err.message}<br>Controleer de console (F12) voor details.</div>`;
                 console.error(err);
             }
         }
 
-        window.onload = () => {
-            initGoogleAuth();
-        };
+        window.onload = () => initGoogleAuth();
     </script>
 </body>
 </html>
